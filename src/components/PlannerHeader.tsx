@@ -9,7 +9,7 @@ const modes: { id: LightingMode; label: string; icon: string }[] = [
 ];
 
 export function PlannerHeader() {
-  const { mode, setMode } = usePlanner();
+  const { mode, setMode, zenMode, toggleZenMode } = usePlanner();
 
   return (
     <header className="relative z-20 flex items-center justify-between px-6 py-3">
@@ -17,7 +17,19 @@ export function PlannerHeader() {
         Springscape
       </h1>
 
-      <nav className="flex gap-1.5">
+      <nav className="flex gap-1.5 items-center">
+        {/* Zen Mode toggle */}
+        <button
+          onClick={toggleZenMode}
+          className={`glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-500 mr-2 ${
+            zenMode
+              ? 'ring-1 ring-accent/50 text-foreground'
+              : 'text-muted-foreground hover:text-foreground/80'
+          }`}
+        >
+          {zenMode ? '⟵ Back' : '✧ Zen'}
+        </button>
+
         {modes.map(m => (
           <button
             key={m.id}

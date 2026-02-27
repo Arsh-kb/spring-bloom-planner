@@ -9,6 +9,7 @@ export interface Task {
   created_at: string;
   due_date?: string;
   tags?: string[];
+  day: string; // day id
 }
 
 export interface Day {
@@ -25,6 +26,7 @@ export interface JournalEntry {
   content: string;
   created_at: string;
   mood?: 'calm' | 'focused' | 'energized' | 'reflective';
+  day: string; // day id for grouping
 }
 
 export interface PlannerState {
@@ -34,4 +36,5 @@ export interface PlannerState {
   pomodoroMinutes: number;
   pomodoroActive: boolean;
   currentDayIndex: number;
+  zenMode: boolean;
 }
