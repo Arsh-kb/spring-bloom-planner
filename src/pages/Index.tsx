@@ -1,13 +1,34 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { PlannerProvider } from '@/context/PlannerContext';
+import { Environment } from '@/components/Environment';
+import { PlannerHeader } from '@/components/PlannerHeader';
+import { PlannerGrid } from '@/components/PlannerGrid';
+import { JournalSidebar } from '@/components/JournalSidebar';
+import { NatureGuest } from '@/components/NatureGuest';
+import { Fireflies } from '@/components/Fireflies';
+import { PomodoroTimer } from '@/components/PomodoroTimer';
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <PlannerProvider>
+      <div className="h-screen w-screen overflow-hidden relative">
+        {/* Layer 0: Environment */}
+        <Environment />
+
+        {/* Layer 1: UI */}
+        <div className="relative z-10 h-full flex flex-col">
+          <PlannerHeader />
+          <div className="flex-1 flex overflow-hidden">
+            <PlannerGrid />
+            <JournalSidebar />
+          </div>
+        </div>
+
+        {/* Layer 2: Life */}
+        <Fireflies />
+        <PomodoroTimer />
+        <NatureGuest />
       </div>
-    </div>
+    </PlannerProvider>
   );
 };
 
