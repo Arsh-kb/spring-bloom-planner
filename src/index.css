@@ -165,3 +165,58 @@
     transition: filter 1.5s ease-in-out, opacity 1.5s ease-in-out;
   }
 }
+
+/* Weather Particles */
+.weather-mote {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: hsla(45, 60%, 80%, 0.5);
+  animation: drift-mote linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.weather-fog {
+  position: absolute;
+  background: hsla(210, 20%, 80%, 0.04);
+  border-radius: 50%;
+  filter: blur(12px);
+  animation: drift-fog ease-in-out infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.weather-rain {
+  position: absolute;
+  top: -10px;
+  width: 1px;
+  height: 18px;
+  background: linear-gradient(180deg, transparent, hsla(210, 30%, 75%, 0.15));
+  animation: rain-grain linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* Vault Slider */
+.vault-slider [data-orientation="horizontal"] {
+  height: 4px;
+  background: hsla(var(--glass-bg));
+  border-radius: 2px;
+  backdrop-filter: blur(8px);
+}
+
+.vault-slider [role="slider"] {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 8px hsl(var(--primary) / 0.4);
+  border: 1px solid hsla(0, 0%, 100%, 0.2);
+}
+
+/* Selection highlight */
+::selection {
+  background: hsla(38, 70%, 55%, 0.2);
+}

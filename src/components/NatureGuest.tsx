@@ -1,58 +1,117 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import sparrowVid from '@/assets/sparrow.mp4';
+import dayLeaf from '@/assets/day-leaf.jpg';
+
+type EventType = 'sparrow' | 'drifting-leaves' | 'bird-silhouette' | 'light-shift';
+
+const weights: { type: EventType; weight: number }[] = [
+  { type: 'sparrow', weight: 30 },
+  { type: 'drifting-leaves', weight: 30 },
+  { type: 'bird-silhouette', weight: 20 },
+  { type: 'light-shift', weight: 20 },
+];
+
+function pickEvent(): EventType {
+  const total = weights.reduce((s, w) => s + w.weight, 0);
+  let r = Math.random() * total;
+  for (const w of weights) {
+    r -= w.weight;
+    if (r <= 0) return w.type;
+  }
+  return 'sparrow';
+}
 
 export function NatureGuest() {
-  const [visible, setVisible] = useState(false);
-  const [key, setKey] = useState(0);
+  const [event, setEvent] = useState<{ type: EventType; key: number } | null>(null);
 
-  useEffect(() => {
-    const scheduleVisit = () => {
-      const delay = 30000 + Math.random() * 15000; // 30-45s
-      const timeout = setTimeout(() => {
-        setKey(k => k + 1);
-        setVisible(true);
-        // Auto-hide after 10s
-        setTimeout(() => {
-          setVisible(false);
-        }, 10000);
-        scheduleVisit();
-      }, delay);
-      return timeout;
-    };
-
-    // First visit after 8-15s
-    const firstTimeout = setTimeout(() => {
-      setKey(k => k + 1);
-      setVisible(true);
-      setTimeout(() => setVisible(false), 10000);
-    }, 8000 + Math.random() * 7000);
-
-    const recurringTimeout = scheduleVisit();
-
-    return () => {
-      clearTimeout(firstTimeout);
-      clearTimeout(recurringTimeout);
-    };
+  const triggerEvent = useCallback(() => {
+    const type = pickEvent();
+    setEvent({ type, key: Date.now() });
+    const duration = type === 'sparrow' ? 10000 : type === 'drifting-leaves' ? 12000 : type === 'bird-silhouette' ? 6000 : 5000;
+    setTimeout(() => setEvent(null), duration);
   }, []);
 
-  if (!visible) return null;
+  useEffect(() => {
+    // First event after 8-15s
+    const first = setTimeout(triggerEvent, 8000 + Math.random() * 7000);
 
-  return (
-    <div
-      key={key}
-      className="fixed bottom-6 right-6 z-30 animate-guest-visit pointer-events-none"
-    >
-      {/* Bg-white and mixBlendMode 'multiply' removes the white background from the video! */}
-      <div className="w-24 h-24 bg-white rounded-full overflow-hidden" style={{ boxShadow: 'var(--guest-shadow)' }}>
-        <video 
-          src={sparrowVid} 
-          autoPlay 
-          muted 
-          playsInline
-          className="w-full h-full object-cover" 
-          style={{ mixBlendMode: 'multiply' }} 
-        />
+    const schedule = () => {
+      const delay = 40000 + Math.random() * 50000; // 40-90s
+      return setTimeout(() => {
+        triggerEvent();
+        scheduleRef = schedule();
+      }, delay);
+    };
+    let scheduleRef = schedule();
+
+    return () => { clearTimeout(first); clearTimeout(scheduleRef); };
+  }, [triggerEvent]);
+
+  if (!event) return null;
+
+  if (event.type === 'sparrow') {
+    return (
+      <div key={event.key} className="fixed bottom-6 right-6 z-30 animate-guest-visit pointer-events-none">
+        <div className="w-24 h-24 bg-white rounded-full overflow-hidden" style={{ boxShadow: 'var(--guest-shadow)' }}>
+          <video src={sparrowVid} autoPlay muted playsInline className="w-full h-full object-cover" style={{ mixBlendMode: 'multiply' }} />
+        </div>
       </div>
+    );
+  }
+
+  if (event.type === 'drifting-leaves') {
+    return (
+      <div key={event.key} className="fixed inset-0 z-30 pointer-events-none overflow-hidden">
+        {[0, 1, 2, 3].map(i => (
+          <div
+            key={i}
+            className="absolute animate-leaf-fall"
+            style={{
+              left: `${15 + i * 20 + Math.random() * 10}%`,
+              top: '-30px',
+              animationDelay: `${i * 1.5}s`,
+              animationDuration: `${8 + Math.random() * 4}s`,
+            }}
+          >
+            <div
+              className="w-5 h-5 rotate-12"
+              style={{
+                backgroundImage: `url(${dayLeaf})`,
+                backgroundSize: 'cover',
+                clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
+                opacity: 0.7,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (event.type === 'bird-silhouette') {
+    return (
+      <div key={event.key} className="fixed inset-0 z-30 pointer-events-none overflow-hidden">
+        <div
+          className="absolute animate-bird-cross"
+          style={{ top: `${8 + Math.random() * 12}%`, left: '-40px' }}
+        >
+          <svg width="28" height="12" viewBox="0 0 28 12" fill="none" className="opacity-40">
+            <path d="M14 6 C10 2, 4 0, 0 4 M14 6 C18 2, 24 0, 28 4" stroke="hsla(0,0%,10%,0.7)" strokeWidth="1.5" fill="none" />
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  // light-shift
+  return (
+    <div key={event.key} className="fixed inset-0 z-[2] pointer-events-none animate-light-pulse">
+      <div
+        className="w-full h-full"
+        style={{
+          background: 'radial-gradient(ellipse at 30% 20%, hsla(45, 80%, 75%, 0.08) 0%, transparent 60%)',
+        }}
+      />
     </div>
   );
 }
