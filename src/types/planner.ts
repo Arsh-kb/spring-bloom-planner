@@ -1,15 +1,18 @@
 export type LightingMode = 'sun' | 'shade' | 'cave' | 'exam';
 
+export type TaskPriority = 'low' | 'medium' | 'high';
+export type JournalMood = 'calm' | 'focused' | 'energized' | 'reflective';
+
 export interface Task {
   id: string;
   title: string;
   description?: string;
   completed: boolean;
-  priority: 'low' | 'medium' | 'high';
+  priority: TaskPriority;
   created_at: string;
   due_date?: string;
   tags?: string[];
-  day: string; // day id
+  date: string; // CHANGED from 'day' so pagination works properly
 }
 
 export interface Day {
@@ -25,8 +28,8 @@ export interface JournalEntry {
   id: string;
   content: string;
   created_at: string;
-  mood?: 'calm' | 'focused' | 'energized' | 'reflective';
-  day: string; // day id for grouping
+  mood?: JournalMood;
+  date: string; // CHANGED from 'day' so entries stick to the calendar
 }
 
 export interface PlannerState {
@@ -37,4 +40,4 @@ export interface PlannerState {
   pomodoroActive: boolean;
   currentDayIndex: number;
   zenMode: boolean;
-}
+} 

@@ -70,17 +70,19 @@
     --muted-foreground: 210 15% 55%;
   }
 
-  /* VibeCoding Cave */
+  /* VibeCoding Cave - REFINED FOR VISIBILITY */
   [data-mode="cave"] {
-    --atmosphere-filter: saturate(0.5) brightness(0.3) contrast(1.1);
-    --atmosphere-overlay: radial-gradient(ellipse at center, transparent 30%, hsla(0, 0%, 0%, 0.7) 100%);
+    /* Boosted brightness from 0.3 to 0.55 so the forest is visible */
+    --atmosphere-filter: saturate(0.6) brightness(0.55) contrast(1.1);
+    /* Softened vignette from 0.7 to 0.45 opacity */
+    --atmosphere-overlay: radial-gradient(ellipse at center, transparent 40%, hsla(0, 0%, 0%, 0.45) 100%);
     --atmosphere-blend: multiply;
     --primary: 140 60% 45%;
     --primary-foreground: 140 30% 8%;
     --accent: 140 50% 35%;
     --foreground: 140 20% 80%;
-    --glass-bg: 140 20% 10% / 0.15;
-    --glass-border: 140 40% 40% / 0.15;
+    --glass-bg: 140 20% 10% / 0.2;
+    --glass-border: 140 40% 40% / 0.2;
     --muted-foreground: 140 15% 50%;
     --card: 140 15% 10%;
     --card-foreground: 140 20% 80%;

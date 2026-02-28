@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import sparrow from '@/assets/sparrow.jpg';
+import sparrowVid from '@/assets/sparrow.mp4';
 
 export function NatureGuest() {
   const [visible, setVisible] = useState(false);
@@ -42,8 +42,16 @@ export function NatureGuest() {
       key={key}
       className="fixed bottom-6 right-6 z-30 animate-guest-visit pointer-events-none"
     >
-      <div className="w-20 h-20 rounded-full overflow-hidden" style={{ boxShadow: 'var(--guest-shadow)' }}>
-        <img src={sparrow} alt="A visiting sparrow" className="w-full h-full object-cover" />
+      {/* Bg-white and mixBlendMode 'multiply' removes the white background from the video! */}
+      <div className="w-24 h-24 bg-white rounded-full overflow-hidden" style={{ boxShadow: 'var(--guest-shadow)' }}>
+        <video 
+          src={sparrowVid} 
+          autoPlay 
+          muted 
+          playsInline
+          className="w-full h-full object-cover" 
+          style={{ mixBlendMode: 'multiply' }} 
+        />
       </div>
     </div>
   );
