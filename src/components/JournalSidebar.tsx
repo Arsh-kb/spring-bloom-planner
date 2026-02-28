@@ -17,7 +17,7 @@ export function JournalSidebar() {
   // Group journal entries by day
   const journalByDay = days.map(day => ({
     day,
-    entries: journal.filter(j => j.day === day.id),
+    entries: journal.filter(j => j.date === day.id),
   })).filter(g => g.entries.length > 0);
 
   return (
