@@ -4,23 +4,33 @@ import darkForest from "@/assets/dark-forest.mp4";
 import { usePlanner } from "@/context/PlannerContext";
 
 export function Environment() {
-  const { mode } = usePlanner();
+  const { mode, season, moodTint } = usePlanner();
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
-  // 🖱️ The Parallax Engine
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       const x = (e.clientX / window.innerWidth - 0.5) * -20;
       const y = (e.clientY / window.innerHeight - 0.5) * -20;
       setOffset({ x, y });
     };
-
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
+  // Compose season + mood tint into filters
+  const seasonFilter = `hue-rotate(${season.hueShift}deg) saturate(${season.saturation})`;
+  const warmthFilter = moodTint.warmth !== 0
+    ? `sepia(${Math.abs(moodTint.warmth) / 200}) hue-rotate(${moodTint.warmth > 0 ? moodTint.warmth * 0.3 : moodTint.warmth * 0.5}deg)`
+    : '';
+  const contrastFilter = moodTint.contrast !== 0
+    ? `contrast(${1 + moodTint.contrast / 100})`
+    : '';
+  const composedFilter = [seasonFilter, warmthFilter, contrastFilter].filter(Boolean).join(' ');
+
+  const atmosphereOpacity = moodTint.depth / 100;
+
   return (
-    <div className="fixed inset-0 z-0 bg-background overflow-hidden">
+    <div className="fixed inset-0 z-0 bg-background overflow-hidden" style={{ transition: 'all 3s ease-in-out' }}>
       {/* Layer 0: Background with Parallax drift */}
       <div
         className="absolute inset-[-50px] transition-transform duration-700 ease-out will-change-transform"
@@ -29,19 +39,16 @@ export function Environment() {
         {mode === "cave" ? (
           <video
             src={darkForest}
-            autoPlay
-            loop
-            muted
-            playsInline
+            autoPlay loop muted playsInline
             className="w-full h-full object-cover atmosphere-transition"
-            style={{ filter: "var(--atmosphere-filter)" }}
+            style={{ filter: `var(--atmosphere-filter) ${composedFilter}` }}
           />
         ) : (
           <img
             src={bgNature}
             alt=""
             className="w-full h-full object-cover animate-slow-zoom atmosphere-transition"
-            style={{ filter: "var(--atmosphere-filter)" }}
+            style={{ filter: `var(--atmosphere-filter) ${composedFilter}` }}
           />
         )}
       </div>
@@ -52,40 +59,42 @@ export function Environment() {
         style={{
           background: "var(--atmosphere-overlay)",
           mixBlendMode: "var(--atmosphere-blend)" as React.CSSProperties["mixBlendMode"],
+          opacity: atmosphereOpacity,
         }}
       />
 
-      {/* Sun flare for sun mode */}
+      {/* Season grain overlay */}
+      {season.grain > 0 && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            opacity: season.grain,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E")`,
+            backgroundSize: '128px 128px',
+            transition: 'opacity 3s ease-in-out',
+          }}
+        />
+      )}
+
+      {/* Sun flare */}
       {mode === "sun" && (
-        <div
-          className="absolute inset-0 pointer-events-none atmosphere-transition"
-          style={{
-            background:
-              "radial-gradient(ellipse at 25% 15%, hsla(38, 80%, 70%, 0.12) 0%, transparent 60%)",
-          }}
-        />
+        <div className="absolute inset-0 pointer-events-none atmosphere-transition" style={{
+          background: `radial-gradient(ellipse at 25% 15%, hsla(${38 + season.hueShift}, 80%, 70%, ${0.12 + season.warmth}) 0%, transparent 60%)`,
+        }} />
       )}
 
-      {/* Vignette for cave mode */}
+      {/* Cave vignette */}
       {mode === "cave" && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, transparent 20%, hsla(0, 0%, 0%, 0.75) 100%)",
-          }}
-        />
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: "radial-gradient(ellipse at center, transparent 20%, hsla(0, 0%, 0%, 0.75) 100%)",
+        }} />
       )}
 
-      {/* Fog overlay for exam mode */}
+      {/* Exam fog */}
       {mode === "exam" && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(180deg, hsla(210, 20%, 85%, 0.15) 0%, hsla(200, 15%, 70%, 0.1) 100%)",
-          }}
-        />
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: "linear-gradient(180deg, hsla(210, 20%, 85%, 0.15) 0%, hsla(200, 15%, 70%, 0.1) 100%)",
+        }} />
       )}
     </div>
   );

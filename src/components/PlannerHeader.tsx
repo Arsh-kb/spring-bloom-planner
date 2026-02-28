@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
 import type { LightingMode } from '@/types/planner';
 import { VaultModal } from './VaultModal';
+import { generateWeekTitle } from '@/lib/narrativeEngine';
 
 const modes: { id: LightingMode; label: string; icon: string }[] = [
   { id: 'sun', label: 'Golden Hour', icon: '☀️' },
@@ -11,17 +12,22 @@ const modes: { id: LightingMode; label: string; icon: string }[] = [
 ];
 
 export function PlannerHeader() {
-  const { mode, setMode, zenMode, toggleZenMode, weekOffset, setWeekOffset } = usePlanner();
+  const { mode, setMode, zenMode, toggleZenMode, weekOffset, setWeekOffset, tasks, journal, season, currentWeekDates } = usePlanner();
   const [showVault, setShowVault] = useState(false);
+
+  const weekTitle = generateWeekTitle(tasks, journal, currentWeekDates);
 
   return (
     <>
       <header className="relative z-20 flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-4">
-          <h1 className="font-display text-xl text-foreground text-nature tracking-wide">
-            Springscape
-          </h1>
-          
+          <div>
+            <h1 className="font-display text-xl text-foreground text-nature tracking-wide">
+              Springscape
+            </h1>
+            <p className="font-display text-[11px] italic text-foreground/35 leading-tight mt-0.5">{weekTitle}</p>
+          </div>
+
           <div className="flex items-center glass-panel rounded-full overflow-hidden text-xs font-body">
             <button onClick={() => setWeekOffset(w => w - 1)} className="px-3 py-1.5 hover:bg-white/10 transition-colors">◀</button>
             <span className="px-2 py-1.5 border-x border-white/10 text-muted-foreground min-w-[80px] text-center">
@@ -29,6 +35,9 @@ export function PlannerHeader() {
             </span>
             <button onClick={() => setWeekOffset(w => w + 1)} className="px-3 py-1.5 hover:bg-white/10 transition-colors">▶</button>
           </div>
+
+          {/* Season indicator */}
+          <span className="font-display text-[10px] italic text-foreground/30 tracking-wider">{season.label}</span>
         </div>
 
         <nav className="flex gap-1.5 items-center">

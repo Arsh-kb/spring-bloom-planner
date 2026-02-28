@@ -6,6 +6,7 @@ import { JournalSidebar } from '@/components/JournalSidebar';
 import { NatureGuest } from '@/components/NatureGuest';
 import { Fireflies } from '@/components/Fireflies';
 import { PomodoroTimer } from '@/components/PomodoroTimer';
+import { WeatherLayerWrapper } from '@/components/WeatherLayerWrapper';
 
 const Index = () => {
   return (
@@ -13,6 +14,9 @@ const Index = () => {
       <div className="h-screen w-screen overflow-hidden relative">
         {/* Layer 0: Environment */}
         <Environment />
+
+        {/* Layer 0.5: Weather */}
+        <WeatherLayerWrapper />
 
         {/* Layer 1: UI */}
         <div className="relative z-10 h-full flex flex-col">

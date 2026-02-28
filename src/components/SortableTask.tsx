@@ -8,28 +8,46 @@ interface SortableTaskProps {
   task: Task;
 }
 
+const moodColors: Record<string, string> = {
+  'high-strain': 'hsla(15, 75%, 55%, 0.9)',
+  'reflective': 'hsla(215, 40%, 60%, 0.9)',
+  'routine': 'hsla(38, 15%, 55%, 0.6)',
+  'energizing': 'hsla(80, 55%, 50%, 0.9)',
+};
+
+const moodGlows: Record<string, string> = {
+  'high-strain': '0 0 4px hsla(15, 75%, 55%, 0.4)',
+  'reflective': '0 0 4px hsla(215, 40%, 60%, 0.4)',
+  'routine': 'none',
+  'energizing': '0 0 4px hsla(80, 55%, 50%, 0.4)',
+};
+
+function getAgingStyle(task: Task): React.CSSProperties {
+  if (task.completed) return {};
+  const age = Math.floor((Date.now() - new Date(task.created_at).getTime()) / 86400000);
+  if (age <= 2) return {};
+  if (age <= 5) return { filter: 'sepia(0.05)', opacity: 0.85 };
+  if (age <= 10) return { filter: 'sepia(0.1)', opacity: 0.8, borderColor: 'hsla(38, 40%, 50%, 0.15)' };
+  return { filter: 'sepia(0.15)', opacity: 0.75, borderRadius: '6px', borderColor: 'hsla(38, 40%, 50%, 0.2)' };
+}
+
 export function SortableTask({ task }: SortableTaskProps) {
   const { toggleTask, deleteTask, updateTask } = usePlanner();
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const inputRef = useRef<HTMLInputElement>(null);
-  
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
-    id: task.id, 
-    data: { type: 'Task', task } 
+
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    data: { type: 'Task', task }
   });
 
-  useEffect(() => {
-    if (isEditing) inputRef.current?.focus();
-  }, [isEditing]);
+  useEffect(() => { if (isEditing) inputRef.current?.focus(); }, [isEditing]);
 
   const handleSaveEdit = () => {
-    if (editTitle.trim() !== '' && editTitle !== task.title) {
-      updateTask(task.id, editTitle.trim());
-    } else {
-      setEditTitle(task.title);
-    }
+    if (editTitle.trim() !== '' && editTitle !== task.title) updateTask(task.id, editTitle.trim());
+    else setEditTitle(task.title);
     setIsEditing(false);
   };
 
@@ -37,8 +55,8 @@ export function SortableTask({ task }: SortableTaskProps) {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 50 : 1,
-    opacity: isDragging ? 0.8 : 1,
     scale: isDragging ? '1.05' : '1',
+    ...getAgingStyle(task),
   };
 
   return (
@@ -51,10 +69,20 @@ export function SortableTask({ task }: SortableTaskProps) {
         isDragging ? 'bg-white/10 shadow-lg backdrop-blur-md ring-1 ring-white/20' : 'hover:bg-white/5 cursor-grab active:cursor-grabbing'
       }`}
     >
-      <div className="mt-1 flex-shrink-0 cursor-default pointer-events-none">
+      <div className="mt-1 flex-shrink-0 cursor-default pointer-events-none flex items-center gap-0.5">
         {task.priority === 'high' && <span title="High" className="text-[10px] drop-shadow-[0_0_2px_#ff4d4d] animate-pulse">🍒</span>}
         {task.priority === 'medium' && <span title="Medium" className="text-[10px] opacity-80">🌿</span>}
         {task.priority === 'low' && <span title="Low" className="text-[10px] opacity-40">🍂</span>}
+        {task.mood && (
+          <span
+            className="inline-block w-[5px] h-[5px] rounded-full ml-0.5"
+            title={task.mood}
+            style={{
+              backgroundColor: moodColors[task.mood],
+              boxShadow: moodGlows[task.mood],
+            }}
+          />
+        )}
       </div>
 
       <button
