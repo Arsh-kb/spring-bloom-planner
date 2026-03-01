@@ -217,6 +217,20 @@
 }
 
 /* Selection highlight */
+/* Soft-Brush Selection Highlighting */
 ::selection {
   background: hsla(38, 70%, 55%, 0.2);
+}
+
+/* Focus Pulse breathe animation - 6 breaths/min */
+@keyframes focus-breathe {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+/* Flora sprout animation */
+@keyframes flora-sprout {
+  0% { transform: scale(0) translateY(4px); opacity: 0; }
+  60% { transform: scale(1.2) translateY(-1px); opacity: 0.8; }
+  100% { transform: scale(1) translateY(0); opacity: 0.7; }
 }
