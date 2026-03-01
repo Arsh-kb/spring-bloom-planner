@@ -74,12 +74,13 @@ export function NatureGuest() {
             }}
           >
             <div
-              className="w-5 h-5 rotate-12"
+              // Added drop-shadow-md to give the falling leaves 3D depth
+              className="w-5 h-5 rotate-12 drop-shadow-md"
               style={{
                 backgroundImage: `url(${dayLeaf})`,
                 backgroundSize: 'cover',
                 clipPath: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
-                opacity: 0.7,
+                opacity: 0.85, // Bumped opacity slightly so they don't look muddy
               }}
             />
           </div>
@@ -95,7 +96,8 @@ export function NatureGuest() {
           className="absolute animate-bird-cross"
           style={{ top: `${8 + Math.random() * 12}%`, left: '-40px' }}
         >
-          <svg width="28" height="12" viewBox="0 0 28 12" fill="none" className="opacity-40">
+          {/* Added drop-shadow-sm to the SVG */}
+          <svg width="28" height="12" viewBox="0 0 28 12" fill="none" className="opacity-40 drop-shadow-sm">
             <path d="M14 6 C10 2, 4 0, 0 4 M14 6 C18 2, 24 0, 28 4" stroke="hsla(0,0%,10%,0.7)" strokeWidth="1.5" fill="none" />
           </svg>
         </div>
@@ -105,11 +107,11 @@ export function NatureGuest() {
 
   // light-shift
   return (
-    <div key={event.key} className="fixed inset-0 z-[2] pointer-events-none animate-light-pulse">
+    <div key={event.key} className="fixed inset-0 z-[2] pointer-events-none animate-light-pulse mix-blend-overlay">
       <div
         className="w-full h-full"
         style={{
-          background: 'radial-gradient(ellipse at 30% 20%, hsla(45, 80%, 75%, 0.08) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 30% 20%, hsla(45, 80%, 75%, 0.15) 0%, transparent 60%)',
         }}
       />
     </div>

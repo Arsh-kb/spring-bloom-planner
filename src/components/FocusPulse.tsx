@@ -11,10 +11,11 @@ export function FocusPulse() {
 
   return (
     <div
-      className="fixed inset-0 z-[1] pointer-events-none"
+      className="fixed inset-0 z-[1] pointer-events-none mix-blend-overlay"
       style={{
         animation: 'focus-breathe 10s ease-in-out infinite',
-        background: 'radial-gradient(ellipse at center, hsla(var(--primary), 0.03) 0%, transparent 70%)',
+        // Corrected CSS syntax for Shadcn/Tailwind color variables
+        background: 'radial-gradient(ellipse at center, hsl(var(--primary) / 0.15) 0%, transparent 70%)',
       }}
     />
   );

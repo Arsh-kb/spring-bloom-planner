@@ -66,15 +66,11 @@ export function DayDetailView({ day, onClose }: DayDetailViewProps) {
     if (!task) return;
     const sub: SubIntention = { id: `si${Date.now()}`, title: text, completed: false };
     const existing = task.subIntentions || [];
-    // We need to update the task - use updateTask with a trick: store sub-intentions in title won't work.
-    // Instead we'll manage sub-intentions locally and through context
-    updateTask(taskId, task.title); // trigger re-render
-    // For sub-intentions, we store them directly
+    
+    updateTask(taskId, task.title); 
     const allTasks = tasks.map(t => t.id === taskId ? { ...t, subIntentions: [...existing, sub] } : t);
-    // We need a way to update sub-intentions - let's use a direct localStorage update approach
     localStorage.setItem('springscape-tasks', JSON.stringify(allTasks));
     setSubIntentionInputs(prev => ({ ...prev, [taskId]: '' }));
-    // Force re-render via a state change
     window.dispatchEvent(new Event('storage'));
   };
 
@@ -109,12 +105,21 @@ export function DayDetailView({ day, onClose }: DayDetailViewProps) {
           backdropFilter: 'blur(40px)',
           WebkitBackdropFilter: 'blur(40px)',
           border: '1px solid hsla(var(--glass-border))',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.4), inset 0 1px 0 hsla(0,0%,100%,0.06)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6), inset 0 1px 0 hsla(0,0%,100%,0.1)',
         }}
       >
+        {/* Adaptive Mode Scrim - PROTECTS TEXT READABILITY */}
+        <div 
+          className="absolute inset-0 top-40 pointer-events-none transition-colors duration-1000" 
+          style={{ 
+            borderRadius: '0 0 3rem 3rem',
+            background: 'linear-gradient(to bottom, hsla(var(--background)/0.4), hsla(var(--background)/0.95))'
+          }} 
+        />
+
         {/* Ruled lines */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ borderRadius: '3rem' }}>
-          <svg width="100%" height="100%" className="opacity-[0.05]">
+        <div className="absolute inset-0 top-40 pointer-events-none overflow-hidden" style={{ borderRadius: '0 0 3rem 3rem' }}>
+          <svg width="100%" height="100%" className="opacity-[0.04]">
             <defs>
               <pattern id="ruled-detail" width="100%" height="32" patternUnits="userSpaceOnUse">
                 <line x1="0" y1="31" x2="100%" y2="31" stroke="currentColor" strokeWidth="0.5" />
@@ -127,25 +132,25 @@ export function DayDetailView({ day, onClose }: DayDetailViewProps) {
         {/* Header banner with blurred video/image */}
         <div className="relative h-40 overflow-hidden" style={{ borderRadius: '3rem 3rem 0 0' }}>
           {isVideo ? (
-            <video src={day.image} autoPlay loop muted playsInline className="w-full h-full object-cover blur-[2px] scale-110" />
+            <video src={day.image} autoPlay loop muted playsInline className="w-full h-full object-cover blur-[3px] scale-110" />
           ) : (
-            <img src={day.image} alt="" className="w-full h-full object-cover blur-[2px] scale-110" />
+            <img src={day.image} alt="" className="w-full h-full object-cover blur-[3px] scale-110" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/70" />
-          <div className="absolute bottom-4 left-8 right-8">
-            <h1 className="font-display text-3xl text-foreground text-nature">{day.name}</h1>
-            <p className="font-display text-sm italic text-foreground/50 mt-0.5">{dateLabel}</p>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/80" />
+          <div className="absolute bottom-4 left-8 right-8 text-nature">
+            <h1 className="font-display text-3xl text-foreground/95 drop-shadow-md">{day.name}</h1>
+            <p className="font-display text-sm italic text-foreground/70 mt-0.5 drop-shadow-sm">{dateLabel}</p>
           </div>
           <button
             onClick={handleClose}
-            className="absolute top-5 right-6 w-8 h-8 rounded-full glass-panel flex items-center justify-center text-foreground/60 hover:text-foreground transition-colors text-sm"
+            className="absolute top-5 right-6 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-foreground/80 hover:text-foreground transition-colors text-sm shadow-lg"
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div className="relative z-10 overflow-y-auto px-8 md:px-12 py-8" style={{ maxHeight: 'calc(92vh - 160px)' }}>
+        <div className="relative z-10 overflow-y-auto px-8 md:px-12 py-8 scrollbar-thin" style={{ maxHeight: 'calc(92vh - 160px)' }}>
           <div className="max-w-[720px] mx-auto space-y-6">
 
             {/* Ungrouped tasks */}
@@ -165,8 +170,8 @@ export function DayDetailView({ day, onClose }: DayDetailViewProps) {
             {grouped.map(({ block, tasks: blockTasks }) => (
               <div key={block}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-display italic text-foreground/30">{timeBlockLabels[block]}</span>
-                  <div className="flex-1 h-px bg-foreground/5" />
+                  <span className="text-xs font-display italic text-foreground/50" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{timeBlockLabels[block]}</span>
+                  <div className="flex-1 h-px bg-foreground/10" />
                 </div>
                 <div className="space-y-2">
                   {blockTasks.map(task => (
@@ -180,43 +185,47 @@ export function DayDetailView({ day, onClose }: DayDetailViewProps) {
               </div>
             ))}
 
-            {/* Add task */}
-            <div className="flex items-center gap-2 border-b border-foreground/10 py-2">
+            {/* Add task Input - Anchored with dark well */}
+            <div className="flex items-center gap-2 border border-foreground/10 bg-black/10 backdrop-blur-sm rounded-lg py-2 px-3 mt-4 focus-within:border-primary/40 transition-colors shadow-inner">
               <input
                 type="text"
                 value={newTaskText}
                 onChange={e => setNewTaskText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddTask()}
                 placeholder="Add a new task..."
-                className="flex-1 bg-transparent text-sm font-body text-foreground/80 placeholder:text-foreground/20 outline-none"
+                className="flex-1 bg-transparent text-sm font-body text-foreground/90 placeholder:text-foreground/30 outline-none"
+                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
               />
             </div>
 
             {/* Quick Reflection */}
-            <div className="pt-6 border-t border-foreground/5">
-              <h3 className="font-display text-sm italic text-foreground/30 mb-3">Quick Reflection</h3>
+            <div className="pt-8 mt-4 border-t border-foreground/10">
+              <h3 className="font-display text-sm italic text-foreground/50 mb-3" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>Quick Reflection</h3>
               {dayJournal.length > 0 && (
                 <div className="space-y-3 mb-4">
                   {dayJournal.map(j => (
-                    <div key={j.id}>
-                      <p className="text-xs font-body text-foreground/60 leading-relaxed">{j.content}</p>
-                      <span className="text-[9px] text-foreground/20 font-body">
+                    <div key={j.id} className="bg-white/5 border border-white/5 rounded-lg p-3 shadow-sm">
+                      <p className="text-xs font-body text-foreground/85 leading-relaxed" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{j.content}</p>
+                      <span className="text-[9px] text-foreground/40 font-body mt-1 block">
                         {new Date(j.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                       </span>
                     </div>
                   ))}
                 </div>
               )}
-              <textarea
-                value={reflection}
-                onChange={e => setReflection(e.target.value)}
-                placeholder="Write a reflection for this day..."
-                rows={3}
-                className="w-full bg-transparent text-sm font-body text-foreground/75 placeholder:text-foreground/15 resize-none outline-none leading-[32px]"
-              />
+              <div className="bg-black/10 border border-foreground/10 rounded-lg p-1 focus-within:border-primary/40 transition-colors shadow-inner">
+                <textarea
+                  value={reflection}
+                  onChange={e => setReflection(e.target.value)}
+                  placeholder="Write a reflection for this day..."
+                  rows={3}
+                  className="w-full bg-transparent text-sm font-body text-foreground/90 placeholder:text-foreground/30 resize-none outline-none leading-[28px] p-2"
+                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+                />
+              </div>
               {reflection.trim() && (
-                <button onClick={handleAddReflection} className="mt-1 glass-panel px-4 py-1 rounded-full text-xs font-body text-foreground/60 hover:text-foreground transition-colors">
-                  Save
+                <button onClick={handleAddReflection} className="mt-2 glass-panel px-5 py-1.5 rounded-full text-xs font-body text-foreground/80 hover:text-foreground transition-colors hover:bg-white/10 shadow-md">
+                  Save Entry
                 </button>
               )}
             </div>
@@ -240,43 +249,52 @@ function TaskRow({ task, onToggle, onDelete, subInput, onSubInputChange, onAddSu
 
   return (
     <div className="group/task">
-      <div className="flex items-start gap-3 py-2 px-1 rounded-md hover:bg-white/[0.02] transition-colors">
+      <div className="flex items-start gap-3 py-2 px-2 rounded-md hover:bg-white/10 transition-colors">
         {/* Priority + mood */}
         <div className="mt-1 flex items-center gap-1 flex-shrink-0">
-          <span className="text-xs">
+          <span className="text-[11px]">
             {task.priority === 'high' ? '🍒' : task.priority === 'medium' ? '🌿' : '🍂'}
           </span>
           {task.mood && (
-            <span className="inline-block w-[5px] h-[5px] rounded-full" style={{ backgroundColor: moodDots[task.mood] || 'transparent' }} />
+            <span className="inline-block w-[5px] h-[5px] rounded-full shadow-sm" style={{ backgroundColor: moodDots[task.mood] || 'transparent' }} />
           )}
         </div>
 
         {/* Checkbox */}
         <button
           onClick={() => onToggle(task.id)}
-          className={`mt-1 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-500 ${
-            task.completed ? 'border-primary/60 bg-primary/30' : 'border-foreground/20 hover:border-foreground/40 bg-transparent'
+          className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-500 shadow-sm ${
+            task.completed ? 'border-primary/60 bg-primary/30' : 'border-foreground/30 hover:border-foreground/60 bg-black/20'
           }`}
         >
-          <div className={`w-2 h-2 rounded-full transition-all duration-500 ${task.completed ? 'bg-foreground/80 scale-100' : 'bg-transparent scale-0'}`} />
+          <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${task.completed ? 'bg-foreground/90 scale-100' : 'bg-transparent scale-0'}`} />
         </button>
 
         {/* Title + description */}
         <div className="flex-1 min-w-0">
-          <span className={`text-sm font-body leading-relaxed block ${task.completed ? 'text-muted-foreground line-through opacity-50' : 'text-foreground/85'}`}>
+          {/* Subtle text shadow added for legibility */}
+          <span 
+            className={`text-sm font-body leading-relaxed block transition-all ${task.completed ? 'text-foreground/40 line-through' : 'text-foreground/95'}`}
+            style={{ textShadow: task.completed ? 'none' : '0 1px 3px rgba(0,0,0,0.6)' }}
+          >
             {task.title}
           </span>
           {task.description && (
-            <p className="text-xs font-body text-foreground/40 mt-0.5">{task.description}</p>
+            <p className="text-xs font-body text-foreground/60 mt-0.5" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{task.description}</p>
           )}
 
           {/* Sub-intentions */}
           {task.subIntentions && task.subIntentions.length > 0 && (
-            <div className="mt-1.5 space-y-1 ml-1 border-l border-foreground/5 pl-3">
+            <div className="mt-2 space-y-1.5 ml-1 border-l-2 border-foreground/10 pl-3">
               {task.subIntentions.map((si: SubIntention) => (
                 <div key={si.id} className="flex items-center gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full ${si.completed ? 'bg-primary/50' : 'bg-foreground/15'}`} />
-                  <span className={`text-[11px] font-body ${si.completed ? 'text-foreground/30 line-through' : 'text-foreground/50'}`}>{si.title}</span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${si.completed ? 'bg-primary/50' : 'bg-foreground/20'}`} />
+                  <span 
+                    className={`text-[11px] font-body ${si.completed ? 'text-foreground/30 line-through' : 'text-foreground/75'}`}
+                    style={{ textShadow: si.completed ? 'none' : '0 1px 2px rgba(0,0,0,0.5)' }}
+                  >
+                    {si.title}
+                  </span>
                 </div>
               ))}
             </div>
@@ -285,8 +303,8 @@ function TaskRow({ task, onToggle, onDelete, subInput, onSubInputChange, onAddSu
 
         {/* Actions */}
         <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity">
-          <button onClick={() => setShowSub(!showSub)} className="text-[10px] text-foreground/30 hover:text-foreground/60 px-1">+sub</button>
-          <button onClick={() => onDelete(task.id)} className="text-foreground/30 hover:text-foreground/60 text-xs px-1">×</button>
+          <button onClick={() => setShowSub(!showSub)} className="text-[10px] text-foreground/50 hover:text-foreground/90 px-1 py-0.5 rounded hover:bg-white/10 transition-colors">+sub</button>
+          <button onClick={() => onDelete(task.id)} className="text-foreground/50 hover:text-destructive/90 text-sm px-1 py-0.5 rounded hover:bg-white/10 transition-colors">×</button>
         </div>
       </div>
 
@@ -299,7 +317,8 @@ function TaskRow({ task, onToggle, onDelete, subInput, onSubInputChange, onAddSu
             onChange={e => onSubInputChange(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && onAddSub()}
             placeholder="Add sub-intention..."
-            className="flex-1 bg-transparent text-[11px] font-body text-foreground/60 placeholder:text-foreground/15 outline-none border-b border-foreground/5 py-1"
+            className="flex-1 bg-black/10 rounded px-2 py-1 text-[11px] font-body text-foreground/80 placeholder:text-foreground/30 outline-none border border-foreground/5 focus:border-primary/30 transition-colors shadow-inner"
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
           />
         </div>
       )}

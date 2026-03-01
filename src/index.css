@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -7,8 +7,8 @@
 @layer base {
   :root {
     /* Nature-driven design system */
-    --font-display: 'Playfair Display', serif;
-    --font-body: 'Source Sans 3', sans-serif;
+    --font-display: "Playfair Display", serif;
+    --font-body: "Source Sans 3", sans-serif;
 
     /* Sun Mode (Default) - Golden hour warmth */
     --background: 38 45% 12%;
@@ -40,7 +40,11 @@
 
     /* Atmosphere filters */
     --atmosphere-filter: saturate(1.2) sepia(0.15) brightness(1.05);
-    --atmosphere-overlay: radial-gradient(ellipse at 30% 20%, hsla(38, 80%, 60%, 0.15), transparent 70%);
+    --atmosphere-overlay: radial-gradient(
+      ellipse at 30% 20%,
+      hsla(38, 80%, 60%, 0.15),
+      transparent 70%
+    );
     --atmosphere-blend: soft-light;
 
     /* Sidebar tokens */
@@ -60,7 +64,11 @@
   /* Shade Mode */
   [data-mode="shade"] {
     --atmosphere-filter: saturate(0.85) brightness(0.88) hue-rotate(15deg);
-    --atmosphere-overlay: linear-gradient(180deg, hsla(210, 40%, 30%, 0.2), hsla(200, 30%, 20%, 0.15));
+    --atmosphere-overlay: linear-gradient(
+      180deg,
+      hsla(210, 40%, 30%, 0.2),
+      hsla(200, 30%, 20%, 0.15)
+    );
     --atmosphere-blend: multiply;
     --primary: 210 45% 55%;
     --primary-foreground: 210 30% 95%;
@@ -75,7 +83,11 @@
     /* Boosted brightness from 0.3 to 0.55 so the forest is visible */
     --atmosphere-filter: saturate(0.6) brightness(0.55) contrast(1.1);
     /* Softened vignette from 0.7 to 0.45 opacity */
-    --atmosphere-overlay: radial-gradient(ellipse at center, transparent 40%, hsla(0, 0%, 0%, 0.45) 100%);
+    --atmosphere-overlay: radial-gradient(
+      ellipse at center,
+      transparent 40%,
+      hsla(0, 0%, 0%, 0.45) 100%
+    );
     --atmosphere-blend: multiply;
     --primary: 140 60% 45%;
     --primary-foreground: 140 30% 8%;
@@ -90,8 +102,13 @@
 
   /* Exam Zone */
   [data-mode="exam"] {
-    --atmosphere-filter: saturate(0.4) brightness(0.75) contrast(0.85) hue-rotate(200deg);
-    --atmosphere-overlay: linear-gradient(180deg, hsla(220, 20%, 70%, 0.25), hsla(200, 15%, 50%, 0.15));
+    --atmosphere-filter: saturate(0.4) brightness(0.75) contrast(0.85)
+      hue-rotate(200deg);
+    --atmosphere-overlay: linear-gradient(
+      180deg,
+      hsla(220, 20%, 70%, 0.25),
+      hsla(200, 15%, 50%, 0.15)
+    );
     --atmosphere-blend: screen;
     --primary: 215 30% 60%;
     --primary-foreground: 220 20% 95%;
@@ -112,7 +129,12 @@
     font-family: var(--font-body);
     overflow: hidden;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
   }
 }
@@ -129,12 +151,14 @@
 
   /* Text with readable shadow for overlay text */
   .text-nature {
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 0, 0, 0.2);
+    text-shadow:
+      0 1px 4px rgba(0, 0, 0, 0.6),
+      0 0 20px rgba(0, 0, 0, 0.2);
   }
 
   /* Inset shadow for physical depth */
   .inset-depth {
-    box-shadow: 
+    box-shadow:
       inset 0 2px 8px rgba(0, 0, 0, 0.4),
       inset 0 -1px 4px rgba(255, 255, 255, 0.05),
       0 4px 16px rgba(0, 0, 0, 0.3);
@@ -142,7 +166,7 @@
 
   /* Neon glow for cave mode timer */
   .neon-glow {
-    text-shadow: 
+    text-shadow:
       0 0 7px hsl(var(--primary)),
       0 0 10px hsl(var(--primary)),
       0 0 21px hsl(var(--primary)),
@@ -156,13 +180,32 @@
     height: 4px;
     border-radius: 50%;
     background: hsl(80, 80%, 65%);
-    box-shadow: 0 0 6px 2px hsla(80, 80%, 65%, 0.6), 0 0 20px 4px hsla(80, 80%, 65%, 0.2);
+    box-shadow:
+      0 0 6px 2px hsla(80, 80%, 65%, 0.6),
+      0 0 20px 4px hsla(80, 80%, 65%, 0.2);
   }
 }
 
 @layer utilities {
   .atmosphere-transition {
-    transition: filter 1.5s ease-in-out, opacity 1.5s ease-in-out;
+    transition:
+      filter 1.5s ease-in-out,
+      opacity 1.5s ease-in-out;
+  }
+  @keyframes nature-breathe {
+    0%,
+    100% {
+      opacity: 0.1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1.05);
+    }
+  }
+
+  .animate-nature-breathe {
+    animation: nature-breathe 10s ease-in-out infinite;
   }
 }
 
@@ -224,13 +267,29 @@
 
 /* Focus Pulse breathe animation - 6 breaths/min */
 @keyframes focus-breathe {
-  0%, 100% { opacity: 0; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.02); }
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
 }
 
 /* Flora sprout animation */
 @keyframes flora-sprout {
-  0% { transform: scale(0) translateY(4px); opacity: 0; }
-  60% { transform: scale(1.2) translateY(-1px); opacity: 0.8; }
-  100% { transform: scale(1) translateY(0); opacity: 0.7; }
+  0% {
+    transform: scale(0) rotate(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.85;
+  }
 }

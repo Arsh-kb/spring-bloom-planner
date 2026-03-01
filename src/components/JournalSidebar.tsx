@@ -33,7 +33,7 @@ export function JournalSidebar() {
 
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col p-4">
-        <h2 className="font-display text-lg text-foreground/90 mb-4 text-nature">
+        <h2 className="font-display text-lg text-foreground/90 mb-4 text-nature drop-shadow-md">
           Field Journal
         </h2>
 
@@ -59,10 +59,10 @@ export function JournalSidebar() {
                   </div>
                   <div className="relative flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-sm overflow-hidden flex-shrink-0">
+                      <div className="w-5 h-5 rounded-sm overflow-hidden flex-shrink-0 border border-white/10">
                         <img src={day.image} alt="" className="w-full h-full object-cover" />
                       </div>
-                      <span className="font-display text-xs text-foreground/80">{day.name}</span>
+                      <span className="font-display text-xs text-foreground/90 drop-shadow-sm">{day.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] text-muted-foreground font-body">{entries.length}</span>
@@ -94,8 +94,8 @@ export function JournalSidebar() {
                           boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.1)',
                         }}
                       >
-                        <p className="text-xs font-body text-foreground/80 leading-relaxed">{j.content}</p>
-                        <span className="text-[10px] text-muted-foreground mt-1 block font-body">
+                        <p className="text-xs font-body text-foreground/90 leading-relaxed" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.3)' }}>{j.content}</p>
+                        <span className="text-[10px] text-foreground/40 mt-1 block font-body">
                           {new Date(j.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                         </span>
                       </div>
@@ -107,21 +107,22 @@ export function JournalSidebar() {
           })}
 
           {journalByDay.length === 0 && (
-            <p className="text-xs italic text-muted-foreground/50 font-body text-center py-4">No entries yet</p>
+            <p className="text-xs italic text-foreground/40 font-body text-center py-4" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>No entries yet</p>
           )}
         </div>
 
-        {/* New entry */}
-        <div className="glass-panel rounded-md p-2" style={{ boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.25)' }}>
+        {/* New entry - Updated to use the shadow well style */}
+        <div className="bg-black/20 border border-foreground/10 rounded-lg p-2 focus-within:border-primary/40 transition-colors shadow-inner">
           <textarea
             value={entry}
             onChange={e => setEntry(e.target.value)}
             placeholder="Write a reflection..."
-            className="w-full bg-transparent text-xs font-body text-foreground/80 placeholder:text-muted-foreground/50 resize-none h-16 outline-none"
+            className="w-full bg-transparent text-xs font-body text-foreground/90 placeholder:text-foreground/40 resize-none h-16 outline-none p-1"
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
           />
           <button
             onClick={handleSubmit}
-            className="w-full text-xs font-body py-1.5 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+            className="w-full mt-1 text-xs font-body py-1.5 rounded bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary-foreground transition-colors border border-primary/20"
           >
             Add Entry
           </button>

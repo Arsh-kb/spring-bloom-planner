@@ -83,7 +83,7 @@ export function GlassboundNotebook({ onClose }: GlassboundNotebookProps) {
           backdropFilter: 'blur(40px)',
           WebkitBackdropFilter: 'blur(40px)',
           border: '1px solid hsla(var(--glass-border))',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.4), inset 0 1px 0 hsla(0,0%,100%,0.06)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6), inset 0 1px 0 hsla(0,0%,100%,0.1)',
         }}
       >
         {/* Ruled lines background */}
@@ -98,52 +98,59 @@ export function GlassboundNotebook({ onClose }: GlassboundNotebookProps) {
           </svg>
         </div>
 
-        {/* Close button */}
+        {/* Polished Close button */}
         <button
           onClick={handleClose}
-          className="absolute top-6 right-6 z-20 w-8 h-8 rounded-full glass-panel flex items-center justify-center text-foreground/50 hover:text-foreground transition-colors text-sm"
+          className="absolute top-6 right-6 z-20 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-foreground/80 hover:text-foreground transition-colors text-sm shadow-lg"
         >
           ×
         </button>
 
         {/* Content */}
-        <div ref={scrollRef} className="relative z-10 h-full overflow-y-auto px-8 md:px-16 py-10" style={{ scrollBehavior: 'smooth' }}>
+        <div ref={scrollRef} className="relative z-10 h-full overflow-y-auto px-8 md:px-16 py-10 scrollbar-thin" style={{ scrollBehavior: 'smooth' }}>
           {/* Floating date stamp */}
           <div className="mb-12">
-            <h1 className="font-display text-3xl text-foreground/90 text-nature mb-1">{todayName}</h1>
-            <p className="font-display text-sm italic text-foreground/35">{dateLabel}</p>
+            <h1 className="font-display text-3xl text-foreground/95 drop-shadow-md text-nature mb-1">{todayName}</h1>
+            <p className="font-display text-sm italic text-foreground/60 drop-shadow-sm">{dateLabel}</p>
           </div>
 
           {/* Writing area */}
           <div className="max-w-[720px] mx-auto">
             {/* New entry input */}
             <div className="mb-12">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-3 pl-2">
                 <button
                   onClick={() => setMood(moodCycle[(moodCycle.indexOf(mood) + 1) % moodCycle.length])}
-                  className="text-lg hover:scale-110 transition-transform"
+                  className="text-lg hover:scale-110 transition-transform drop-shadow-sm"
                   title={mood}
                 >
                   {moodIcons[mood]}
                 </button>
-                <span className="text-[10px] font-display italic text-foreground/30 capitalize">{mood}</span>
+                <span className="text-[11px] font-display italic text-foreground/50 capitalize" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{mood}</span>
               </div>
-              <textarea
-                ref={textareaRef}
-                value={entry}
-                onChange={e => setEntry(e.target.value)}
-                placeholder="Begin writing..."
-                rows={5}
-                className="w-full bg-transparent text-base font-body text-foreground/85 placeholder:text-foreground/20 resize-none outline-none leading-[32px]"
-                style={{ lineHeight: '32px' }}
-              />
+              
+              {/* Added Input Well */}
+              <div className="bg-black/10 border border-foreground/10 rounded-xl p-4 focus-within:border-primary/30 transition-colors shadow-inner">
+                <textarea
+                  ref={textareaRef}
+                  value={entry}
+                  onChange={e => setEntry(e.target.value)}
+                  placeholder="Begin writing..."
+                  rows={5}
+                  className="w-full bg-transparent text-base font-body text-foreground/90 placeholder:text-foreground/30 resize-none outline-none leading-[32px]"
+                  style={{ lineHeight: '32px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+                />
+              </div>
+              
               {entry.trim() && (
-                <button
-                  onClick={handleSubmit}
-                  className="mt-2 glass-panel px-5 py-1.5 rounded-full text-xs font-body text-foreground/70 hover:text-foreground transition-colors"
-                >
-                  Save Entry
-                </button>
+                <div className="flex justify-end mt-3">
+                  <button
+                    onClick={handleSubmit}
+                    className="glass-panel px-6 py-2 rounded-full text-xs font-body text-foreground/80 hover:text-foreground transition-colors hover:bg-white/10 shadow-md"
+                  >
+                    Save Entry
+                  </button>
+                </div>
               )}
             </div>
 
@@ -152,21 +159,21 @@ export function GlassboundNotebook({ onClose }: GlassboundNotebookProps) {
               {entriesByDate.map(({ date, dayName, entries }) => (
                 <div key={date}>
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="font-display text-xs italic text-foreground/25">{dayName}</span>
-                    <div className="flex-1 h-px bg-foreground/5" />
-                    <span className="text-[10px] font-body text-foreground/20">
+                    <span className="font-display text-xs italic text-foreground/50" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{dayName}</span>
+                    <div className="flex-1 h-px bg-foreground/10" />
+                    <span className="text-[10px] font-body text-foreground/40" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
                       {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                   </div>
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {entries.map(j => (
-                      <div key={j.id} className="group">
-                        <p className="text-sm font-body text-foreground/75 leading-[32px]">{j.content}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[9px] text-foreground/20 font-body">
+                      <div key={j.id} className="group bg-black/5 border border-white/5 rounded-xl p-5 shadow-sm hover:bg-black/10 transition-colors">
+                        <p className="text-sm font-body text-foreground/90 leading-[32px]" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{j.content}</p>
+                        <div className="flex items-center gap-2 mt-3">
+                          <span className="text-[10px] text-foreground/40 font-body">
                             {new Date(j.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                           </span>
-                          {j.mood && <span className="text-[9px] text-foreground/15 font-display italic capitalize">{j.mood}</span>}
+                          {j.mood && <span className="text-[10px] text-foreground/30 font-display italic capitalize">{j.mood}</span>}
                         </div>
                       </div>
                     ))}

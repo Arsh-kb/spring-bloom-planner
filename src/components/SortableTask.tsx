@@ -65,17 +65,17 @@ export function SortableTask({ task }: SortableTaskProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`flex items-start gap-2 group/task relative p-1 rounded-md transition-colors ${
-        isDragging ? 'bg-white/10 shadow-lg backdrop-blur-md ring-1 ring-white/20' : 'hover:bg-white/5 cursor-grab active:cursor-grabbing'
+      className={`flex items-start gap-2 group/task relative p-1.5 rounded-md transition-colors ${
+        isDragging ? 'bg-black/30 shadow-2xl backdrop-blur-md ring-1 ring-white/20' : 'hover:bg-white/10 cursor-grab active:cursor-grabbing'
       }`}
     >
       <div className="mt-1 flex-shrink-0 cursor-default pointer-events-none flex items-center gap-0.5">
-        {task.priority === 'high' && <span title="High" className="text-[10px] drop-shadow-[0_0_2px_#ff4d4d] animate-pulse">🍒</span>}
-        {task.priority === 'medium' && <span title="Medium" className="text-[10px] opacity-80">🌿</span>}
-        {task.priority === 'low' && <span title="Low" className="text-[10px] opacity-40">🍂</span>}
+        {task.priority === 'high' && <span title="High" className="text-[11px] drop-shadow-md animate-pulse">🍒</span>}
+        {task.priority === 'medium' && <span title="Medium" className="text-[11px] opacity-90 drop-shadow-sm">🌿</span>}
+        {task.priority === 'low' && <span title="Low" className="text-[11px] opacity-60 drop-shadow-sm">🍂</span>}
         {task.mood && (
           <span
-            className="inline-block w-[5px] h-[5px] rounded-full ml-0.5"
+            className="inline-block w-[5px] h-[5px] rounded-full ml-0.5 shadow-sm"
             title={task.mood}
             style={{
               backgroundColor: moodColors[task.mood],
@@ -88,11 +88,11 @@ export function SortableTask({ task }: SortableTaskProps) {
       <button
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => toggleTask(task.id)}
-        className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-500 ${
-          task.completed ? 'border-primary/60 bg-primary/30 shadow-[0_0_8px_hsla(var(--primary)/0.4)]' : 'border-foreground/20 hover:border-foreground/40 bg-transparent'
+        className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-500 shadow-sm ${
+          task.completed ? 'border-primary/60 bg-primary/30 shadow-[0_0_8px_hsla(var(--primary)/0.4)]' : 'border-foreground/30 hover:border-foreground/60 bg-black/20'
         }`}
       >
-        <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${task.completed ? 'bg-foreground/80 scale-100' : 'bg-transparent scale-0'}`} />
+        <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${task.completed ? 'bg-foreground/90 scale-100' : 'bg-transparent scale-0'}`} />
       </button>
 
       <div className="flex-1" onDoubleClick={() => setIsEditing(true)} onPointerDown={(e) => isEditing && e.stopPropagation()}>
@@ -103,12 +103,17 @@ export function SortableTask({ task }: SortableTaskProps) {
             onChange={(e) => setEditTitle(e.target.value)}
             onBlur={handleSaveEdit}
             onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
-            className="w-full bg-black/20 text-xs font-body text-white border border-white/20 rounded px-1 outline-none focus:border-primary/50"
+            // Updated inline input to match our "well" styling
+            className="w-full bg-black/20 text-sm font-body text-foreground/95 border border-foreground/10 rounded px-2 py-0.5 outline-none focus:border-primary/40 shadow-inner"
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
           />
         ) : (
-          <span className={`text-xs font-body leading-tight transition-all duration-500 block ${
-            task.completed ? 'text-muted-foreground line-through opacity-50' : 'text-foreground/85'
-          }`}>
+          <span 
+            className={`text-sm font-body leading-tight transition-all duration-500 block ${
+              task.completed ? 'text-foreground/40 line-through' : 'text-foreground/95'
+            }`}
+            style={{ textShadow: task.completed ? 'none' : '0 1px 2px rgba(0,0,0,0.6)' }}
+          >
             {task.title}
           </span>
         )}
@@ -117,7 +122,7 @@ export function SortableTask({ task }: SortableTaskProps) {
       <button
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => deleteTask(task.id)}
-        className="opacity-0 group-hover/task:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground text-xs flex-shrink-0 ml-1 px-1"
+        className="opacity-0 group-hover/task:opacity-80 hover:!opacity-100 transition-opacity text-foreground/50 hover:text-destructive text-sm flex-shrink-0 ml-1 px-1 py-0.5 rounded hover:bg-white/10"
       >
         ×
       </button>

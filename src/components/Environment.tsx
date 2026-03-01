@@ -1,17 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import bgNature from "@/assets/bg-nature.jpg";
 import darkForest from "@/assets/dark-forest.mp4";
 import { usePlanner } from "@/context/PlannerContext";
 
 export function Environment() {
-  const { mode, season, moodTint } = usePlanner();
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  // Grab pomodoroActive to trigger the 6 BPM haptics
+  const { mode, season, moodTint, pomodoroActive } = usePlanner();
+  
+  // PERFORMANCE FIX: Use a ref instead of state to avoid massive re-renders
+  const parallaxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let ticking = false;
     const handleMouseMove = (e: MouseEvent) => {
-      const x = (e.clientX / window.innerWidth - 0.5) * -20;
-      const y = (e.clientY / window.innerHeight - 0.5) * -20;
-      setOffset({ x, y });
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (parallaxRef.current) {
+            const x = (e.clientX / window.innerWidth - 0.5) * -20;
+            const y = (e.clientY / window.innerHeight - 0.5) * -20;
+            // Direct DOM manipulation bypasses the React render cycle
+            parallaxRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
@@ -31,10 +44,12 @@ export function Environment() {
 
   return (
     <div className="fixed inset-0 z-0 bg-background overflow-hidden" style={{ transition: 'all 3s ease-in-out' }}>
-      {/* Layer 0: Background with Parallax drift */}
+      
+      {/* Layer 0: Background with Parallax drift (Now Ref-based) */}
       <div
+        ref={parallaxRef}
         className="absolute inset-[-50px] transition-transform duration-700 ease-out will-change-transform"
-        style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0)` }}
+        style={{ transform: `translate3d(0px, 0px, 0)` }}
       >
         {mode === "cave" ? (
           <video
@@ -95,6 +110,18 @@ export function Environment() {
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "linear-gradient(180deg, hsla(210, 20%, 85%, 0.15) 0%, hsla(200, 15%, 70%, 0.1) 100%)",
         }} />
+      )}
+
+      {/* NATURE HAPTICS: 6 BPM Focus Pulse */}
+      {pomodoroActive && (
+        <div 
+          className="absolute inset-0 pointer-events-none mix-blend-overlay animate-nature-breathe"
+          style={{
+            background: mode === 'cave' 
+              ? 'radial-gradient(ellipse at center, hsla(140, 60%, 50%, 0.15) 0%, transparent 60%)' 
+              : 'radial-gradient(ellipse at center, hsla(38, 70%, 60%, 0.15) 0%, transparent 60%)'
+          }}
+        />
       )}
     </div>
   );

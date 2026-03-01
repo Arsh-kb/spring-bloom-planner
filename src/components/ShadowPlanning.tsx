@@ -50,24 +50,24 @@ export function ShadowPlanning({ dayId }: ShadowPlanningProps) {
   if (dayId !== todayDayId || (suggestions.length === 0 && ghostTasks.length === 0)) return null;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5 mt-2">
       {/* Ghost deadlines */}
       {ghostTasks.length > 0 && (
         <div className="px-1 py-0.5">
-          <span className="text-[9px] font-display italic text-destructive/40">
+          <span className="text-[10px] font-display italic text-destructive/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
             {ghostTasks.length} task{ghostTasks.length > 1 ? 's' : ''} aging
           </span>
         </div>
       )}
 
-      {/* Shadow suggestions */}
+      {/* Shadow suggestions - Turned into tactile ghost buttons */}
       {suggestions.slice(0, 2).map((s, i) => (
         <button
           key={i}
           onClick={() => addTask(dayId, s.text, s.priority, s.mood, s.timeBlock)}
-          className="w-full text-left flex items-center gap-1.5 px-1 py-0.5 rounded opacity-30 hover:opacity-60 transition-opacity group/shadow"
+          className="w-full text-left flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/5 hover:bg-black/15 border border-white/5 hover:border-white/10 transition-all group/shadow shadow-sm"
         >
-          <span className="text-[9px] text-foreground/40 font-body italic">+ {s.text}</span>
+          <span className="text-[10px] text-foreground/50 font-body italic group-hover/shadow:text-foreground/90 transition-colors" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>+ {s.text}</span>
         </button>
       ))}
     </div>

@@ -23,30 +23,33 @@ export function PlannerHeader() {
 
   return (
     <>
-      <header className="relative z-20 flex items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-4">
+      <header className="relative z-30 flex items-center justify-between px-6 py-4">
+        {/* Protective Top Scrim for Readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
+        
+        <div className="relative z-10 flex items-center gap-4">
           <div>
-            <h1 className="font-display text-xl text-foreground text-nature tracking-wide">
+            <h1 className="font-display text-xl text-foreground/95 text-nature tracking-wide drop-shadow-md">
               Springscape
             </h1>
-            <p className="font-display text-[11px] italic text-foreground/35 leading-tight mt-0.5">{weekTitle}</p>
+            <p className="font-display text-[11px] italic text-foreground/60 leading-tight mt-0.5 drop-shadow-sm">{weekTitle}</p>
           </div>
 
-          <div className="flex items-center glass-panel rounded-full overflow-hidden text-xs font-body">
-            <button onClick={() => setWeekOffset(w => w - 1)} className="px-3 py-1.5 hover:bg-white/10 transition-colors">◀</button>
-            <span className="px-2 py-1.5 border-x border-white/10 text-muted-foreground min-w-[80px] text-center">
+          <div className="flex items-center bg-black/20 backdrop-blur-md rounded-full overflow-hidden text-xs font-body border border-white/10 shadow-inner">
+            <button onClick={() => setWeekOffset(w => w - 1)} className="px-3 py-1.5 hover:bg-white/10 text-foreground/80 hover:text-foreground transition-colors">◀</button>
+            <span className="px-2 py-1.5 border-x border-white/10 text-foreground/60 min-w-[80px] text-center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
               {weekOffset === 0 ? 'This Week' : weekOffset === -1 ? 'Last Week' : weekOffset === 1 ? 'Next Week' : `${Math.abs(weekOffset)} Wks ${weekOffset > 0 ? 'Ahead' : 'Ago'}`}
             </span>
-            <button onClick={() => setWeekOffset(w => w + 1)} className="px-3 py-1.5 hover:bg-white/10 transition-colors">▶</button>
+            <button onClick={() => setWeekOffset(w => w + 1)} className="px-3 py-1.5 hover:bg-white/10 text-foreground/80 hover:text-foreground transition-colors">▶</button>
           </div>
 
-          <span className="font-display text-[10px] italic text-foreground/30 tracking-wider">{season.label}</span>
+          <span className="font-display text-[11px] italic text-foreground/50 tracking-wider" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{season.label}</span>
 
           {/* Circadian hint */}
           {suggestedMode !== mode && (
             <button
               onClick={() => setMode(suggestedMode)}
-              className="text-[9px] font-body text-foreground/20 hover:text-foreground/40 transition-colors italic"
+              className="text-[10px] font-body text-primary/60 hover:text-primary transition-colors italic bg-black/20 px-2 py-1 rounded-full border border-primary/20"
               title={`Circadian suggests: ${suggestedMode}`}
             >
               ◐ {suggestedMode}
@@ -54,19 +57,19 @@ export function PlannerHeader() {
           )}
         </div>
 
-        <nav className="flex gap-1.5 items-center">
-          <button onClick={() => setShowNotebook(true)} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-500 mr-1 text-muted-foreground hover:text-foreground/80">
+        <nav className="relative z-10 flex gap-2 items-center">
+          <button onClick={() => setShowNotebook(true)} className="glass-panel px-4 py-1.5 rounded-full text-xs font-body transition-all duration-500 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm">
             📓 Journal
           </button>
-          <button onClick={() => setShowVault(true)} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-500 mr-2 text-muted-foreground hover:text-foreground/80">
+          <button onClick={() => setShowVault(true)} className="glass-panel px-4 py-1.5 rounded-full text-xs font-body transition-all duration-500 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm">
             ⚙️ Vault
           </button>
-          <button onClick={toggleZenMode} className={`glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-500 mr-2 ${zenMode ? 'ring-1 ring-accent/50 text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}>
+          <button onClick={toggleZenMode} className={`glass-panel px-4 py-1.5 rounded-full text-xs font-body transition-all duration-500 shadow-sm ${zenMode ? 'ring-1 ring-primary/50 text-foreground bg-black/20' : 'text-foreground/70 hover:text-foreground hover:bg-white/5'}`}>
             {zenMode ? '⟵ Back' : '✧ Zen'}
           </button>
           {modes.map(m => (
-            <button key={m.id} onClick={() => setMode(m.id)} className={`glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-500 ${mode === m.id ? 'ring-1 ring-primary/50 text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}>
-              <span className="mr-1">{m.icon}</span>{m.label}
+            <button key={m.id} onClick={() => setMode(m.id)} className={`glass-panel px-4 py-1.5 rounded-full text-xs font-body transition-all duration-500 shadow-sm ${mode === m.id ? 'ring-1 ring-primary/60 text-foreground bg-primary/10' : 'text-foreground/60 hover:text-foreground hover:bg-white/5'}`}>
+              <span className="mr-1.5 opacity-80">{m.icon}</span>{m.label}
             </button>
           ))}
         </nav>
