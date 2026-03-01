@@ -140,6 +140,7 @@ export default {
         "leaf-fall": "leaf-fall 10s ease-in-out forwards",
         "bird-cross": "bird-cross 6s linear forwards",
         "light-pulse": "light-pulse 5s ease-in-out forwards",
+        "flora-sprout": "flora-sprout 0.8s ease-out both",
       },
     },
   },

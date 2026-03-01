@@ -7,6 +7,7 @@ import { NatureGuest } from '@/components/NatureGuest';
 import { Fireflies } from '@/components/Fireflies';
 import { PomodoroTimer } from '@/components/PomodoroTimer';
 import { WeatherLayerWrapper } from '@/components/WeatherLayerWrapper';
+import { FocusPulse } from '@/components/FocusPulse';
 
 const Index = () => {
   return (
@@ -17,6 +18,9 @@ const Index = () => {
 
         {/* Layer 0.5: Weather */}
         <WeatherLayerWrapper />
+
+        {/* Nature Haptics: Focus Pulse */}
+        <FocusPulse />
 
         {/* Layer 1: UI */}
         <div className="relative z-10 h-full flex flex-col">

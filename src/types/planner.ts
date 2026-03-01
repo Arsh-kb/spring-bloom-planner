@@ -6,6 +6,12 @@ export type TaskMood = 'high-strain' | 'reflective' | 'routine' | 'energizing';
 export type TimeBlock = 'morning' | 'afternoon' | 'evening';
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
+export interface SubIntention {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -18,6 +24,7 @@ export interface Task {
   date: string;
   mood?: TaskMood;
   timeBlock?: TimeBlock;
+  subIntentions?: SubIntention[];
 }
 
 export interface Day {
@@ -38,15 +45,22 @@ export interface JournalEntry {
 }
 
 export interface MoodTint {
-  warmth: number;   // -50 to +50
-  contrast: number;  // -30 to +30
-  depth: number;     // 0 to 100
+  warmth: number;
+  contrast: number;
+  depth: number;
 }
 
 export interface TimeCapsule {
   tasks: Task[];
   journal: JournalEntry[];
   createdAt: string;
+}
+
+export interface ShadowSuggestion {
+  text: string;
+  priority: TaskPriority;
+  mood?: TaskMood;
+  timeBlock?: TimeBlock;
 }
 
 export interface PlannerState {

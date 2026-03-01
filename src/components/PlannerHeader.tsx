@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
 import type { LightingMode } from '@/types/planner';
 import { VaultModal } from './VaultModal';
+import { GlassboundNotebook } from './GlassboundNotebook';
 import { generateWeekTitle } from '@/lib/narrativeEngine';
+import { useCircadianRhythm } from '@/hooks/useCircadianRhythm';
 
 const modes: { id: LightingMode; label: string; icon: string }[] = [
   { id: 'sun', label: 'Golden Hour', icon: '☀️' },
@@ -14,8 +16,10 @@ const modes: { id: LightingMode; label: string; icon: string }[] = [
 export function PlannerHeader() {
   const { mode, setMode, zenMode, toggleZenMode, weekOffset, setWeekOffset, tasks, journal, season, currentWeekDates } = usePlanner();
   const [showVault, setShowVault] = useState(false);
+  const [showNotebook, setShowNotebook] = useState(false);
 
   const weekTitle = generateWeekTitle(tasks, journal, currentWeekDates);
+  const { suggestedMode } = useCircadianRhythm(mode, setMode, false);
 
   return (
     <>
@@ -36,11 +40,24 @@ export function PlannerHeader() {
             <button onClick={() => setWeekOffset(w => w + 1)} className="px-3 py-1.5 hover:bg-white/10 transition-colors">▶</button>
           </div>
 
-          {/* Season indicator */}
           <span className="font-display text-[10px] italic text-foreground/30 tracking-wider">{season.label}</span>
+
+          {/* Circadian hint */}
+          {suggestedMode !== mode && (
+            <button
+              onClick={() => setMode(suggestedMode)}
+              className="text-[9px] font-body text-foreground/20 hover:text-foreground/40 transition-colors italic"
+              title={`Circadian suggests: ${suggestedMode}`}
+            >
+              ◐ {suggestedMode}
+            </button>
+          )}
         </div>
 
         <nav className="flex gap-1.5 items-center">
+          <button onClick={() => setShowNotebook(true)} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-500 mr-1 text-muted-foreground hover:text-foreground/80">
+            📓 Journal
+          </button>
           <button onClick={() => setShowVault(true)} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-500 mr-2 text-muted-foreground hover:text-foreground/80">
             ⚙️ Vault
           </button>
@@ -55,6 +72,7 @@ export function PlannerHeader() {
         </nav>
       </header>
       {showVault && <VaultModal onClose={() => setShowVault(false)} />}
+      {showNotebook && <GlassboundNotebook onClose={() => setShowNotebook(false)} />}
     </>
   );
 }
