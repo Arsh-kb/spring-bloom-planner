@@ -14,9 +14,11 @@ const modeSuggestions: Record<LightingMode, ShadowSuggestion[]> = {
     { text: 'Review & plan', priority: 'high', mood: 'reflective', timeBlock: 'evening' },
   ],
   cave: [
-    { text: 'Deep work session', priority: 'high', mood: 'high-strain', timeBlock: 'morning' },
+    { text: 'Refactor module', priority: 'high', mood: 'high-strain', timeBlock: 'morning' },
+    { text: 'Write tests', priority: 'high', mood: 'routine', timeBlock: 'afternoon' },
     { text: 'Code review', priority: 'high', mood: 'high-strain', timeBlock: 'afternoon' },
-    { text: 'Architecture planning', priority: 'high', mood: 'reflective', timeBlock: 'evening' },
+    { text: 'Architecture sketch', priority: 'medium', mood: 'reflective', timeBlock: 'evening' },
+    { text: 'Debug session', priority: 'high', mood: 'high-strain', timeBlock: 'morning' },
   ],
   exam: [
     { text: 'Study block', priority: 'high', mood: 'high-strain', timeBlock: 'morning' },

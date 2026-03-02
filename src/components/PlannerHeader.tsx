@@ -3,8 +3,10 @@ import { usePlanner } from '@/context/PlannerContext';
 import type { LightingMode } from '@/types/planner';
 import { VaultModal } from './VaultModal';
 import { GlassboundNotebook } from './GlassboundNotebook';
+import { WeeklyStreakDots } from './WeeklyStreakDots';
 import { generateWeekTitle } from '@/lib/narrativeEngine';
 import { useCircadianRhythm } from '@/hooks/useCircadianRhythm';
+import { useAmbientSound } from '@/hooks/useAmbientSound';
 
 const modes: { id: LightingMode; label: string; icon: string }[] = [
   { id: 'sun', label: 'Golden Hour', icon: '☀️' },
@@ -14,17 +16,20 @@ const modes: { id: LightingMode; label: string; icon: string }[] = [
 ];
 
 export function PlannerHeader() {
-  const { mode, setMode, zenMode, toggleZenMode, weekOffset, setWeekOffset, tasks, journal, season, currentWeekDates } = usePlanner();
+  const { mode, setMode, zenMode, toggleZenMode, weekOffset, setWeekOffset, tasks, journal, season, currentWeekDates, enterDeepFocus, todayDayId } = usePlanner();
   const [showVault, setShowVault] = useState(false);
   const [showNotebook, setShowNotebook] = useState(false);
 
   const weekTitle = generateWeekTitle(tasks, journal, currentWeekDates);
   const { suggestedMode } = useCircadianRhythm(mode, setMode, false);
+  const { muted, toggleMute } = useAmbientSound(mode);
+
+  // Find first uncompleted task for quick deep focus
+  const todayFirstTask = tasks.find(t => t.date === todayDayId && !t.completed);
 
   return (
     <>
       <header className="relative z-30 flex items-center justify-between px-6 py-4">
-        {/* Protective Top Scrim for Readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
         
         <div className="relative z-10 flex items-center gap-4">
@@ -43,9 +48,11 @@ export function PlannerHeader() {
             <button onClick={() => setWeekOffset(w => w + 1)} className="px-3 py-1.5 hover:bg-white/10 text-foreground/80 hover:text-foreground transition-colors">▶</button>
           </div>
 
+          {/* Streak dots */}
+          <WeeklyStreakDots />
+
           <span className="font-display text-[11px] italic text-foreground/50 tracking-wider" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{season.label}</span>
 
-          {/* Circadian hint */}
           {suggestedMode !== mode && (
             <button
               onClick={() => setMode(suggestedMode)}
@@ -58,7 +65,25 @@ export function PlannerHeader() {
         </div>
 
         <nav className="relative z-10 flex gap-2 items-center">
-          <button onClick={() => setShowNotebook(true)} className="glass-panel px-4 py-1.5 rounded-full text-xs font-body transition-all duration-500 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm">
+          {/* Sound toggle */}
+          <button
+            onClick={toggleMute}
+            className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-500 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm"
+            title={muted ? 'Unmute ambient' : 'Mute ambient'}
+          >
+            {muted ? '🔇' : '🔊'}
+          </button>
+
+          {/* Deep Focus */}
+          <button
+            onClick={() => enterDeepFocus(todayFirstTask?.id)}
+            className="glass-panel px-4 py-1.5 rounded-full text-xs font-body transition-all duration-500 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm"
+            title="Enter Deep Focus (D)"
+          >
+            🎯 Focus
+          </button>
+
+          <button data-journal-btn onClick={() => setShowNotebook(true)} className="glass-panel px-4 py-1.5 rounded-full text-xs font-body transition-all duration-500 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm">
             📓 Journal
           </button>
           <button onClick={() => setShowVault(true)} className="glass-panel px-4 py-1.5 rounded-full text-xs font-body transition-all duration-500 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm">
@@ -72,6 +97,8 @@ export function PlannerHeader() {
               <span className="mr-1.5 opacity-80">{m.icon}</span>{m.label}
             </button>
           ))}
+          {/* Keyboard hint */}
+          <span className="text-[9px] font-body text-foreground/30 ml-1" title="Press ? for shortcuts">⌨ ?</span>
         </nav>
       </header>
       {showVault && <VaultModal onClose={() => setShowVault(false)} />}

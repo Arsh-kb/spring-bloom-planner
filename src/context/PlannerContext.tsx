@@ -44,13 +44,13 @@ function getWeekDates(weekOffset: number = 0): string[] {
 const initialDates = getWeekDates(0);
 
 const defaultTasks: Task[] = [
-  { id: "1", title: "Morning meditation", completed: true, priority: "medium", created_at: new Date().toISOString(), date: initialDates[0], timeBlock: "morning" },
+  { id: "1", title: "Morning meditation", completed: true, priority: "medium", created_at: new Date().toISOString(), date: initialDates[0], timeBlock: "morning", recurrence: "weekday" },
   { id: "2", title: "Review sprint backlog", completed: false, priority: "high", created_at: new Date().toISOString(), date: initialDates[0], mood: "high-strain", timeBlock: "morning" },
   { id: "3", title: "Plant the herb garden", completed: false, priority: "low", created_at: new Date().toISOString(), date: initialDates[1], mood: "energizing" },
   { id: "4", title: "Deep work: feature branch", completed: false, priority: "high", created_at: new Date().toISOString(), date: initialDates[2], mood: "high-strain", timeBlock: "afternoon" },
   { id: "5", title: "Read 30 pages", completed: false, priority: "medium", created_at: new Date().toISOString(), date: initialDates[2], mood: "reflective", timeBlock: "evening" },
-  { id: "6", title: "Team standup", completed: false, priority: "medium", created_at: new Date().toISOString(), date: initialDates[3], mood: "routine", timeBlock: "morning" },
-  { id: "7", title: "Weekly review", completed: false, priority: "high", created_at: new Date().toISOString(), date: initialDates[4], timeBlock: "afternoon" },
+  { id: "6", title: "Team standup", completed: false, priority: "medium", created_at: new Date().toISOString(), date: initialDates[3], mood: "routine", timeBlock: "morning", recurrence: "weekday" },
+  { id: "7", title: "Weekly review", completed: false, priority: "high", created_at: new Date().toISOString(), date: initialDates[4], timeBlock: "afternoon", recurrence: "weekly" },
   { id: "8", title: "Sunset walk", completed: false, priority: "low", created_at: new Date().toISOString(), date: initialDates[4], mood: "energizing", timeBlock: "evening" },
   { id: "9", title: "Nature journaling", completed: false, priority: "low", created_at: new Date().toISOString(), date: initialDates[5], mood: "reflective" },
   { id: "10", title: "Rest & recharge", completed: false, priority: "low", created_at: new Date().toISOString(), date: initialDates[6] },
@@ -80,7 +80,7 @@ interface PlannerContextType {
   journal: JournalEntry[];
 
   toggleTask: (taskId: string) => void;
-  addTask: (dateStr: string, title: string, priority: "low" | "medium" | "high", mood?: TaskMood, timeBlock?: TimeBlock) => void;
+  addTask: (dateStr: string, title: string, priority: "low" | "medium" | "high", mood?: TaskMood, timeBlock?: TimeBlock, recurrence?: Task['recurrence']) => void;
   updateTask: (taskId: string, title: string) => void;
   deleteTask: (taskId: string) => void;
   moveTask: (taskId: string, targetDateStr: string) => void;
@@ -102,12 +102,17 @@ interface PlannerContextType {
   toggleZenMode: () => void;
   todayDayId: string;
 
-  // New features
   season: { season: string; label: string; hueShift: number; saturation: number; warmth: number; grain: number };
   moodTint: MoodTint;
   setMoodTint: (tint: MoodTint) => void;
   capsules: Record<string, TimeCapsule>;
   currentWeekDates: string[];
+
+  // Deep Focus
+  deepFocusActive: boolean;
+  focusTaskId: string | null;
+  enterDeepFocus: (taskId?: string) => void;
+  exitDeepFocus: () => void;
 }
 
 const PlannerContext = createContext<PlannerContextType | null>(null);
@@ -125,6 +130,10 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const [pomodoroActive, setPomodoroActive] = useState(false);
   const [zenMode, setZenMode] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
+
+  // Deep Focus state
+  const [deepFocusActive, setDeepFocusActive] = useState(false);
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
 
   const todayDateObj = new Date();
   const todayDayId = `${todayDateObj.getFullYear()}-${String(todayDateObj.getMonth() + 1).padStart(2, "0")}-${String(todayDateObj.getDate()).padStart(2, "0")}`;
@@ -161,8 +170,6 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
 
   // Time Capsule: auto-snapshot previous week on mount
   useEffect(() => {
-    const thisWeekDates = getWeekDates(0);
-    const mondayKey = thisWeekDates[0];
     const prevWeekDates = getWeekDates(-1);
     const prevMondayKey = prevWeekDates[0];
 
@@ -172,7 +179,6 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       if (prevTasks.length > 0 || prevJournal.length > 0) {
         setCapsules(prev => {
           const updated = { ...prev, [prevMondayKey]: { tasks: prevTasks, journal: prevJournal, createdAt: new Date().toISOString() } };
-          // Prune to 12 weeks
           const keys = Object.keys(updated).sort();
           while (keys.length > 12) { delete updated[keys.shift()!]; }
           return updated;
@@ -182,10 +188,52 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Recurrence: auto-generate recurring tasks when week changes
+  useEffect(() => {
+    const recurringTemplates = tasks.filter(t => t.recurrence);
+    if (recurringTemplates.length === 0) return;
+
+    const newTasks: Task[] = [];
+    for (const template of recurringTemplates) {
+      const datesToGenerate: string[] = [];
+
+      if (template.recurrence === 'daily') {
+        datesToGenerate.push(...currentWeekDates);
+      } else if (template.recurrence === 'weekday') {
+        datesToGenerate.push(...currentWeekDates.slice(0, 5));
+      } else if (template.recurrence === 'weekly') {
+        // Same day of the week as the original
+        const origDayOfWeek = new Date(template.date).getDay();
+        const mappedIdx = origDayOfWeek === 0 ? 6 : origDayOfWeek - 1; // Mon=0
+        if (currentWeekDates[mappedIdx]) datesToGenerate.push(currentWeekDates[mappedIdx]);
+      }
+
+      for (const dateStr of datesToGenerate) {
+        // Don't duplicate if a task with same title + date + recurrence already exists
+        const exists = tasks.some(t => t.title === template.title && t.date === dateStr);
+        if (!exists) {
+          newTasks.push({
+            ...template,
+            id: `r${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            date: dateStr,
+            completed: false,
+            created_at: new Date().toISOString(),
+            subIntentions: [],
+          });
+        }
+      }
+    }
+
+    if (newTasks.length > 0) {
+      setTasks(prev => [...prev, ...newTasks]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOffset]);
+
   const toggleTask = useCallback((taskId: string) => setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, completed: !t.completed } : t)), [setTasks]);
 
-  const addTask = useCallback((dateStr: string, title: string, priority: "low" | "medium" | "high", mood?: TaskMood, timeBlock?: TimeBlock) => {
-    const newTask: Task = { id: `t${Date.now()}`, title, completed: false, priority, created_at: new Date().toISOString(), date: dateStr, mood, timeBlock };
+  const addTask = useCallback((dateStr: string, title: string, priority: "low" | "medium" | "high", mood?: TaskMood, timeBlock?: TimeBlock, recurrence?: Task['recurrence']) => {
+    const newTask: Task = { id: `t${Date.now()}`, title, completed: false, priority, created_at: new Date().toISOString(), date: dateStr, mood, timeBlock, recurrence: recurrence || null };
     setTasks((prev) => [...prev, newTask]);
   }, [setTasks]);
 
@@ -211,12 +259,24 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const resetPomodoro = useCallback(() => { setPomodoroActive(false); setPomodoroMinutes(defaultPomodoro); setPomodoroSeconds(0); }, [defaultPomodoro]);
   const toggleZenMode = useCallback(() => setZenMode((z) => !z), []);
 
+  // Deep Focus
+  const enterDeepFocus = useCallback((taskId?: string) => {
+    setFocusTaskId(taskId || null);
+    setDeepFocusActive(true);
+  }, []);
+
+  const exitDeepFocus = useCallback(() => {
+    setDeepFocusActive(false);
+    setFocusTaskId(null);
+  }, []);
+
   return (
     <PlannerContext.Provider value={{
       mode, setMode, days, tasks, journal, toggleTask, addTask, updateTask, deleteTask, moveTask,
       addJournalEntry, restoreData, weekOffset, setWeekOffset, defaultPomodoro, setDefaultPomodoro,
       pomodoroMinutes, pomodoroSeconds, pomodoroActive, togglePomodoro, resetPomodoro,
       zenMode, toggleZenMode, todayDayId, season, moodTint, setMoodTint, capsules, currentWeekDates,
+      deepFocusActive, focusTaskId, enterDeepFocus, exitDeepFocus,
     }}>
       {children}
     </PlannerContext.Provider>

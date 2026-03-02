@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Day, TaskMood, TimeBlock } from '@/types/planner';
+import type { Day, TaskMood, TimeBlock, TaskRecurrence } from '@/types/planner';
 import { usePlanner } from '@/context/PlannerContext';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -23,6 +23,8 @@ const moodDots: Record<string, string> = {
 
 const timeBlockCycle: (TimeBlock | undefined)[] = [undefined, 'morning', 'afternoon', 'evening'];
 const timeBlockIcons: Record<string, string> = { morning: '🌅', afternoon: '☀️', evening: '🌙' };
+const recurrenceCycle: (TaskRecurrence | undefined)[] = [undefined, 'daily', 'weekday', 'weekly'];
+const recurrenceLabels: Record<string, string> = { daily: '🔄', weekday: '📅', weekly: '📌' };
 
 const timeBlockTints: Record<string, { bg: string; label: string }> = {
   morning: { bg: 'hsla(38, 60%, 70%, 0.06)', label: 'Morning' },
@@ -31,11 +33,12 @@ const timeBlockTints: Record<string, { bg: string; label: string }> = {
 };
 
 export function DayCard({ day, isToday, onZoom }: DayCardProps) {
-  const { addTask } = usePlanner();
+  const { addTask, enterDeepFocus } = usePlanner();
   const [newTaskText, setNewTaskText] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [mood, setMood] = useState<TaskMood | undefined>(undefined);
   const [timeBlock, setTimeBlock] = useState<TimeBlock | undefined>(undefined);
+  const [recurrence, setRecurrence] = useState<TaskRecurrence | undefined>(undefined);
   const completedCount = day.tasks.filter(t => t.completed).length;
 
   const { setNodeRef, isOver } = useDroppable({ id: day.id, data: { type: 'Day', day } });
@@ -43,11 +46,12 @@ export function DayCard({ day, isToday, onZoom }: DayCardProps) {
 
   const handleAddTask = () => {
     if (!newTaskText.trim()) return;
-    addTask(day.id, newTaskText.trim(), priority, mood, timeBlock);
+    addTask(day.id, newTaskText.trim(), priority, mood, timeBlock, recurrence || null);
     setNewTaskText('');
     setPriority('medium');
     setMood(undefined);
     setTimeBlock(undefined);
+    setRecurrence(undefined);
   };
 
   const cyclePriority = () => {
@@ -63,6 +67,11 @@ export function DayCard({ day, isToday, onZoom }: DayCardProps) {
   const cycleTimeBlock = () => {
     const idx = timeBlockCycle.indexOf(timeBlock);
     setTimeBlock(timeBlockCycle[(idx + 1) % timeBlockCycle.length]);
+  };
+
+  const cycleRecurrence = () => {
+    const idx = recurrenceCycle.indexOf(recurrence);
+    setRecurrence(recurrenceCycle[(idx + 1) % recurrenceCycle.length]);
   };
 
   const handleHeaderClick = (e: React.MouseEvent) => {
@@ -156,6 +165,9 @@ export function DayCard({ day, isToday, onZoom }: DayCardProps) {
           </button>
           <button onClick={cycleTimeBlock} className="flex-shrink-0 text-[10px] opacity-80 hover:scale-110 transition-transform drop-shadow-sm" title={timeBlock || 'No time block'}>
             {timeBlock ? timeBlockIcons[timeBlock] : '⏱'}
+          </button>
+          <button onClick={cycleRecurrence} className="flex-shrink-0 text-[10px] opacity-80 hover:scale-110 transition-transform drop-shadow-sm" title={recurrence ? `Recurs: ${recurrence}` : 'No recurrence'}>
+            {recurrence ? recurrenceLabels[recurrence] : '↻'}
           </button>
           <input
             type="text"
