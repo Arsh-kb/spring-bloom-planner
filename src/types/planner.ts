@@ -12,6 +12,8 @@ export interface SubIntention {
   completed: boolean;
 }
 
+export type TaskRecurrence = 'daily' | 'weekday' | 'weekly' | null;
+
 export interface Task {
   id: string;
   title: string;
@@ -25,6 +27,7 @@ export interface Task {
   mood?: TaskMood;
   timeBlock?: TimeBlock;
   subIntentions?: SubIntention[];
+  recurrence?: TaskRecurrence;
 }
 
 export interface Day {
@@ -71,4 +74,6 @@ export interface PlannerState {
   pomodoroActive: boolean;
   currentDayIndex: number;
   zenMode: boolean;
+  deepFocusActive: boolean;
+  focusTaskId: string | null;
 }

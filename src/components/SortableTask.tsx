@@ -32,7 +32,7 @@ function getAgingStyle(task: Task): React.CSSProperties {
 }
 
 export function SortableTask({ task }: SortableTaskProps) {
-  const { toggleTask, deleteTask, updateTask } = usePlanner();
+  const { toggleTask, deleteTask, updateTask, enterDeepFocus } = usePlanner();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
@@ -83,6 +83,9 @@ export function SortableTask({ task }: SortableTaskProps) {
             }}
           />
         )}
+        {task.recurrence && (
+          <span className="text-[8px] text-foreground/40 ml-0.5" title={`Recurs: ${task.recurrence}`}>↻</span>
+        )}
       </div>
 
       <button
@@ -119,13 +122,25 @@ export function SortableTask({ task }: SortableTaskProps) {
         )}
       </div>
 
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => deleteTask(task.id)}
-        className="opacity-0 group-hover/task:opacity-80 hover:!opacity-100 transition-opacity text-foreground/50 hover:text-destructive text-sm flex-shrink-0 ml-1 px-1 py-0.5 rounded hover:bg-white/10"
-      >
-        ×
-      </button>
+      <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover/task:opacity-80 transition-opacity">
+        {!task.completed && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => enterDeepFocus(task.id)}
+            className="text-[10px] text-foreground/50 hover:text-primary transition-colors px-1 py-0.5 rounded hover:bg-white/10"
+            title="Deep Focus on this"
+          >
+            🎯
+          </button>
+        )}
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => deleteTask(task.id)}
+          className="text-foreground/50 hover:text-destructive text-sm px-1 py-0.5 rounded hover:bg-white/10 transition-colors"
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }
