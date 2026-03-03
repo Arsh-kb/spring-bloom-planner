@@ -7,17 +7,21 @@ import type { Day } from "@/types/planner";
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
+  DragOverlay,
 } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
 
 export function PlannerGrid() {
-  const { days, zenMode, moveTask } = usePlanner();
+  const { days, zenMode, moveTask, reorderTasks, tasks } = usePlanner();
   const today = new Date().toISOString().split("T")[0];
   const [showMasterList, setShowMasterList] = useState(false);
   const [zoomedDay, setZoomedDay] = useState<Day | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -27,21 +31,56 @@ export function PlannerGrid() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveTaskId(null);
     if (!over) return;
+
     const taskId = active.id as string;
     const overId = over.id as string;
     const isOverDay = over.data.current?.type === "Day";
     const isOverTask = over.data.current?.type === "Task";
-    if (isOverDay) moveTask(taskId, overId);
-    else if (isOverTask) {
-      const targetDayId = over.data.current?.task.day;
-      if (targetDayId) moveTask(taskId, targetDayId);
+
+    const activeTask = tasks.find(t => t.id === taskId);
+    if (!activeTask) return;
+
+    if (isOverDay) {
+      // Moving to a different day
+      if (activeTask.date !== overId) {
+        moveTask(taskId, overId);
+      }
+    } else if (isOverTask) {
+      const overTask = over.data.current?.task;
+      if (!overTask) return;
+
+      if (activeTask.date === overTask.date) {
+        // Reorder within same day
+        const dayTasks = days.find(d => d.id === activeTask.date)?.tasks || [];
+        const oldIndex = dayTasks.findIndex(t => t.id === taskId);
+        const newIndex = dayTasks.findIndex(t => t.id === overId);
+        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+          const newOrder = arrayMove(dayTasks, oldIndex, newIndex);
+          reorderTasks(activeTask.date, newOrder.map(t => t.id));
+        }
+      } else {
+        // Move to different day
+        moveTask(taskId, overTask.date);
+      }
     }
   };
 
+  const handleDragStart = (event: any) => {
+    setActiveTaskId(event.active.id as string);
+  };
+
+  const activeTaskData = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
+
   return (
     <div className="flex-1 p-4 overflow-y-auto relative">
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
         <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-min transition-all duration-700 ${
           zenMode ? "opacity-0 scale-95 pointer-events-none" : "opacity-100 scale-100"
         }`}>
@@ -52,6 +91,16 @@ export function PlannerGrid() {
             <DayCard key={day.id} day={day} isToday={day.date === today} onZoom={setZoomedDay} />
           ))}
         </div>
+
+        {/* Drag overlay */}
+        <DragOverlay>
+          {activeTaskData && (
+            <div className="glass-panel px-3 py-2 rounded-md shadow-2xl backdrop-blur-xl border border-white/20 text-sm font-body text-foreground/90 max-w-[200px] truncate">
+              {activeTaskData.priority === 'high' ? '🍒' : activeTaskData.priority === 'medium' ? '🌿' : '🍂'}{' '}
+              {activeTaskData.title}
+            </div>
+          )}
+        </DragOverlay>
       </DndContext>
 
       {zenMode && (
