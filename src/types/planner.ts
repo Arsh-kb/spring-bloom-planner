@@ -28,6 +28,7 @@ export interface Task {
   timeBlock?: TimeBlock;
   subIntentions?: SubIntention[];
   recurrence?: TaskRecurrence;
+  sortOrder?: number;
 }
 
 export interface Day {
@@ -64,6 +65,28 @@ export interface ShadowSuggestion {
   priority: TaskPriority;
   mood?: TaskMood;
   timeBlock?: TimeBlock;
+}
+
+export interface FocusSession {
+  id: string;
+  taskId: string | null;
+  taskTitle: string;
+  duration: number; // seconds
+  tabSwitches: number;
+  completedAt: string;
+}
+
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  tasks: Array<{
+    title: string;
+    priority: TaskPriority;
+    mood?: TaskMood;
+    timeBlock?: TimeBlock;
+    recurrence?: TaskRecurrence;
+    dayIndex: number; // 0-6, Mon-Sun
+  }>;
 }
 
 export interface PlannerState {

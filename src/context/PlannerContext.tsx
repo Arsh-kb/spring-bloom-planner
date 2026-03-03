@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import type { LightingMode, Day, JournalEntry, Task, MoodTint, TaskMood, TimeBlock, TimeCapsule } from "@/types/planner";
+import type { LightingMode, Day, JournalEntry, Task, MoodTint, TaskMood, TimeBlock, TimeCapsule, FocusSession, TaskTemplate } from "@/types/planner";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSeasonalEngine } from "@/hooks/useSeasonalEngine";
 
@@ -67,7 +67,9 @@ function buildDays(tasks: Task[], currentWeekDates: string[]): Day[] {
     name,
     short: dayShorts[i],
     date: currentWeekDates[i],
-    tasks: tasks.filter((t) => t.date === currentWeekDates[i]),
+    tasks: tasks
+      .filter((t) => t.date === currentWeekDates[i])
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
     image: dayImages[i],
   }));
 }
@@ -82,8 +84,10 @@ interface PlannerContextType {
   toggleTask: (taskId: string) => void;
   addTask: (dateStr: string, title: string, priority: "low" | "medium" | "high", mood?: TaskMood, timeBlock?: TimeBlock, recurrence?: Task['recurrence']) => void;
   updateTask: (taskId: string, title: string) => void;
+  updateTaskDetails: (taskId: string, details: Partial<Pick<Task, 'description' | 'due_date' | 'tags' | 'mood' | 'timeBlock' | 'priority'>>) => void;
   deleteTask: (taskId: string) => void;
   moveTask: (taskId: string, targetDateStr: string) => void;
+  reorderTasks: (dayId: string, taskIds: string[]) => void;
 
   addJournalEntry: (content: string, dateStr: string, mood?: "calm" | "focused" | "energized" | "reflective") => void;
   restoreData: (importedTasks: Task[], importedJournal: JournalEntry[]) => void;
@@ -113,6 +117,15 @@ interface PlannerContextType {
   focusTaskId: string | null;
   enterDeepFocus: (taskId?: string) => void;
   exitDeepFocus: () => void;
+
+  // Focus sessions history
+  focusSessions: FocusSession[];
+  addFocusSession: (session: FocusSession) => void;
+
+  // Templates
+  templates: TaskTemplate[];
+  saveTemplate: (template: TaskTemplate) => void;
+  deleteTemplate: (id: string) => void;
 }
 
 const PlannerContext = createContext<PlannerContextType | null>(null);
@@ -124,6 +137,8 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const [defaultPomodoro, setDefaultPomodoro] = useLocalStorage<number>("springscape-pomodoro", 25);
   const [moodTint, setMoodTint] = useLocalStorage<MoodTint>("springscape-mood-tint", { warmth: 0, contrast: 0, depth: 50 });
   const [capsules, setCapsules] = useLocalStorage<Record<string, TimeCapsule>>("springscape-capsules", {});
+  const [focusSessions, setFocusSessions] = useLocalStorage<FocusSession[]>("springscape-focus-sessions", []);
+  const [templates, setTemplates] = useLocalStorage<TaskTemplate[]>("springscape-templates", []);
 
   const [pomodoroMinutes, setPomodoroMinutes] = useState(defaultPomodoro);
   const [pomodoroSeconds, setPomodoroSeconds] = useState(0);
@@ -168,11 +183,10 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [pomodoroActive, defaultPomodoro]);
 
-  // Time Capsule: auto-snapshot previous week on mount
+  // Time Capsule
   useEffect(() => {
     const prevWeekDates = getWeekDates(-1);
     const prevMondayKey = prevWeekDates[0];
-
     if (!capsules[prevMondayKey]) {
       const prevTasks = tasks.filter(t => prevWeekDates.includes(t.date));
       const prevJournal = journal.filter(j => prevWeekDates.includes(j.date));
@@ -188,28 +202,21 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recurrence: auto-generate recurring tasks when week changes
+  // Recurrence
   useEffect(() => {
     const recurringTemplates = tasks.filter(t => t.recurrence);
     if (recurringTemplates.length === 0) return;
-
     const newTasks: Task[] = [];
     for (const template of recurringTemplates) {
       const datesToGenerate: string[] = [];
-
-      if (template.recurrence === 'daily') {
-        datesToGenerate.push(...currentWeekDates);
-      } else if (template.recurrence === 'weekday') {
-        datesToGenerate.push(...currentWeekDates.slice(0, 5));
-      } else if (template.recurrence === 'weekly') {
-        // Same day of the week as the original
+      if (template.recurrence === 'daily') datesToGenerate.push(...currentWeekDates);
+      else if (template.recurrence === 'weekday') datesToGenerate.push(...currentWeekDates.slice(0, 5));
+      else if (template.recurrence === 'weekly') {
         const origDayOfWeek = new Date(template.date).getDay();
-        const mappedIdx = origDayOfWeek === 0 ? 6 : origDayOfWeek - 1; // Mon=0
+        const mappedIdx = origDayOfWeek === 0 ? 6 : origDayOfWeek - 1;
         if (currentWeekDates[mappedIdx]) datesToGenerate.push(currentWeekDates[mappedIdx]);
       }
-
       for (const dateStr of datesToGenerate) {
-        // Don't duplicate if a task with same title + date + recurrence already exists
         const exists = tasks.some(t => t.title === template.title && t.date === dateStr);
         if (!exists) {
           newTasks.push({
@@ -223,10 +230,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
-
-    if (newTasks.length > 0) {
-      setTasks(prev => [...prev, ...newTasks]);
-    }
+    if (newTasks.length > 0) setTasks(prev => [...prev, ...newTasks]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekOffset]);
 
@@ -238,6 +242,11 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   }, [setTasks]);
 
   const updateTask = useCallback((taskId: string, title: string) => { setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, title } : t))); }, [setTasks]);
+
+  const updateTaskDetails = useCallback((taskId: string, details: Partial<Pick<Task, 'description' | 'due_date' | 'tags' | 'mood' | 'timeBlock' | 'priority'>>) => {
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...details } : t)));
+  }, [setTasks]);
+
   const deleteTask = useCallback((taskId: string) => setTasks((prev) => prev.filter((t) => t.id !== taskId)), [setTasks]);
 
   const moveTask = useCallback((taskId: string, targetDateStr: string) => {
@@ -247,6 +256,17 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       const newTasks = [...prev];
       newTasks[idx] = { ...newTasks[idx], date: targetDateStr };
       return newTasks;
+    });
+  }, [setTasks]);
+
+  const reorderTasks = useCallback((dayId: string, taskIds: string[]) => {
+    setTasks((prev) => {
+      const updated = [...prev];
+      taskIds.forEach((id, index) => {
+        const taskIdx = updated.findIndex(t => t.id === id);
+        if (taskIdx !== -1) updated[taskIdx] = { ...updated[taskIdx], sortOrder: index };
+      });
+      return updated;
     });
   }, [setTasks]);
 
@@ -270,13 +290,27 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     setFocusTaskId(null);
   }, []);
 
+  const addFocusSession = useCallback((session: FocusSession) => {
+    setFocusSessions(prev => [...prev, session]);
+  }, [setFocusSessions]);
+
+  const saveTemplate = useCallback((template: TaskTemplate) => {
+    setTemplates(prev => [...prev, template]);
+  }, [setTemplates]);
+
+  const deleteTemplate = useCallback((id: string) => {
+    setTemplates(prev => prev.filter(t => t.id !== id));
+  }, [setTemplates]);
+
   return (
     <PlannerContext.Provider value={{
-      mode, setMode, days, tasks, journal, toggleTask, addTask, updateTask, deleteTask, moveTask,
+      mode, setMode, days, tasks, journal, toggleTask, addTask, updateTask, updateTaskDetails, deleteTask, moveTask, reorderTasks,
       addJournalEntry, restoreData, weekOffset, setWeekOffset, defaultPomodoro, setDefaultPomodoro,
       pomodoroMinutes, pomodoroSeconds, pomodoroActive, togglePomodoro, resetPomodoro,
       zenMode, toggleZenMode, todayDayId, season, moodTint, setMoodTint, capsules, currentWeekDates,
       deepFocusActive, focusTaskId, enterDeepFocus, exitDeepFocus,
+      focusSessions, addFocusSession,
+      templates, saveTemplate, deleteTemplate,
     }}>
       {children}
     </PlannerContext.Provider>

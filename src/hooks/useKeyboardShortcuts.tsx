@@ -23,6 +23,7 @@ export function useKeyboardShortcuts(
       case 'arrowleft': setWeekOffset(w => w - 1); break;
       case 'arrowright': setWeekOffset(w => w + 1); break;
       case '?': e.preventDefault(); setShowCheatSheet(prev => !prev); break;
+      case '/': e.preventDefault(); window.dispatchEvent(new CustomEvent('open-task-search')); break;
     }
   }, [onOpenJournal, onOpenDeepFocus, toggleZenMode, setMode, setWeekOffset]);
 
@@ -38,6 +39,7 @@ const shortcuts = [
   { key: 'J', desc: 'Open Journal' },
   { key: 'Z', desc: 'Toggle Zen Mode' },
   { key: 'D', desc: 'Deep Focus' },
+  { key: '/', desc: 'Search Tasks' },
   { key: '1-4', desc: 'Switch Lighting' },
   { key: '← →', desc: 'Navigate Weeks' },
   { key: '?', desc: 'Toggle this sheet' },

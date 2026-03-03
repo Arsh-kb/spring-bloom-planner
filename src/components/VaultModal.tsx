@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
 import { Slider } from '@/components/ui/slider';
+import { TaskTemplates } from './TaskTemplates';
 
 export function VaultModal({ onClose }: { onClose: () => void }) {
   const { tasks, journal, restoreData, defaultPomodoro, setDefaultPomodoro, moodTint, setMoodTint, capsules } = usePlanner();
@@ -69,24 +70,18 @@ export function VaultModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
-      {/* Slightly darker backdrop for focus */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
       
-      {/* Modal Container: Widened to max-w-4xl, fixed max height, no global scrolling */}
       <div className="relative z-10 w-full max-w-4xl glass-panel rounded-2xl p-8 text-left max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-        
-        {/* Header */}
         <div className="flex items-center justify-between mb-6 border-b border-foreground/10 pb-4 flex-shrink-0">
           <h2 className="font-display text-3xl text-foreground/95 text-nature drop-shadow-md">The Vault</h2>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/20 text-foreground/60 hover:text-foreground hover:bg-black/40 transition-colors text-xl shadow-inner border border-white/5">×</button>
         </div>
 
-        {/* Two-Column Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 flex-1 overflow-hidden">
-          
-          {/* LEFT COLUMN: Controls & Settings */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 flex-1 overflow-y-auto scrollbar-thin pr-1">
+          {/* LEFT COLUMN */}
           <div className="space-y-8 flex flex-col">
-            {/* Atmosphere / Mood Tint */}
+            {/* Atmosphere */}
             <section>
               <h3 className="font-body text-xs text-foreground/50 mb-4 uppercase tracking-widest" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>Atmosphere</h3>
               <div className="space-y-6 bg-black/10 border border-white/5 p-5 rounded-xl shadow-inner">
@@ -127,10 +122,13 @@ export function VaultModal({ onClose }: { onClose: () => void }) {
                 />
               </div>
             </section>
+
+            {/* Templates */}
+            <TaskTemplates />
           </div>
 
-          {/* RIGHT COLUMN: Data & Backups */}
-          <div className="space-y-8 flex flex-col overflow-hidden">
+          {/* RIGHT COLUMN */}
+          <div className="space-y-8 flex flex-col">
             {/* Data Backup */}
             <section className="flex-shrink-0">
               <h3 className="font-body text-xs text-foreground/50 mb-3 uppercase tracking-widest" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>Data & Backup</h3>
@@ -142,7 +140,7 @@ export function VaultModal({ onClose }: { onClose: () => void }) {
               <p className="text-[11px] text-foreground/40 mt-3 italic" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.4)' }}>Your data never leaves your device.</p>
             </section>
 
-            {/* Time Capsules - Only this section scrolls if needed! */}
+            {/* Time Capsules */}
             {capsuleKeys.length > 0 && (
               <section className="flex flex-col flex-1 overflow-hidden min-h-[150px]">
                 <h3 className="font-body text-xs text-foreground/50 mb-4 uppercase tracking-widest flex-shrink-0" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>Time Capsules</h3>
@@ -173,7 +171,6 @@ export function VaultModal({ onClose }: { onClose: () => void }) {
               </section>
             )}
           </div>
-          
         </div>
       </div>
     </div>
