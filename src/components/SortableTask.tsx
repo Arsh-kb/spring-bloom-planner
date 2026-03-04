@@ -95,13 +95,13 @@ export function SortableTask({ task }: SortableTaskProps) {
         {...attributes}
         {...listeners}
         className={`flex items-start gap-2 group/task relative p-1.5 rounded-md transition-colors ${
-          isDragging ? 'bg-black/30 shadow-2xl backdrop-blur-md ring-1 ring-white/20' : 'hover:bg-white/10 cursor-grab active:cursor-grabbing'
+          isDragging ? 'bg-black/40 shadow-2xl backdrop-blur-md ring-1 ring-white/20' : 'hover:bg-white/10 cursor-grab active:cursor-grabbing'
         }`}
       >
         <div className="mt-1 flex-shrink-0 cursor-default pointer-events-none flex items-center gap-0.5">
-          {task.priority === 'high' && <span title="High" className="text-[11px] drop-shadow-md animate-pulse">🍒</span>}
-          {task.priority === 'medium' && <span title="Medium" className="text-[11px] opacity-90 drop-shadow-sm">🌿</span>}
-          {task.priority === 'low' && <span title="Low" className="text-[11px] opacity-60 drop-shadow-sm">🍂</span>}
+          {task.priority === 'high' && <span title="High" className="text-[11px] drop-shadow-lg animate-pulse">🍒</span>}
+          {task.priority === 'medium' && <span title="Medium" className="text-[11px] opacity-90 drop-shadow-md">🌿</span>}
+          {task.priority === 'low' && <span title="Low" className="text-[11px] opacity-60 drop-shadow-md">🍂</span>}
           {task.mood && (
             <span
               className="inline-block w-[5px] h-[5px] rounded-full ml-0.5 shadow-sm"
@@ -135,15 +135,14 @@ export function SortableTask({ task }: SortableTaskProps) {
               onChange={(e) => setEditTitle(e.target.value)}
               onBlur={handleSaveEdit}
               onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
-              className="w-full bg-black/20 text-sm font-body text-foreground/95 border border-foreground/10 rounded px-2 py-0.5 outline-none focus:border-primary/40 shadow-inner"
-              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+              className="w-full bg-black/30 text-sm font-body text-foreground border border-foreground/15 rounded px-2 py-0.5 outline-none focus:border-primary/40 shadow-inner"
             />
           ) : (
             <span
               className={`text-sm font-body leading-tight transition-all duration-500 block cursor-pointer ${
-                task.completed ? 'text-foreground/40 line-through' : 'text-foreground/95'
+                task.completed ? 'text-foreground/40 line-through' : 'text-foreground'
               }`}
-              style={{ textShadow: task.completed ? 'none' : '0 1px 2px rgba(0,0,0,0.6)' }}
+              style={{ textShadow: task.completed ? 'none' : '0 1px 3px rgba(0,0,0,0.7)' }}
               onDoubleClick={() => setIsEditing(true)}
               onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
               onPointerDown={(e) => e.stopPropagation()}
@@ -152,14 +151,14 @@ export function SortableTask({ task }: SortableTaskProps) {
               {task.tags && task.tags.length > 0 && (
                 <span className="inline-flex gap-1 ml-2">
                   {task.tags.map(tag => (
-                    <span key={tag} className="text-[8px] bg-primary/10 text-primary/60 px-1 py-0 rounded-full">{tag}</span>
+                    <span key={tag} className="text-[8px] bg-primary/15 text-primary/70 px-1 py-0 rounded-full">{tag}</span>
                   ))}
                 </span>
               )}
             </span>
           )}
           {task.due_date && !expanded && (
-            <span className="text-[9px] text-foreground/40 font-body block mt-0.5">
+            <span className="text-[9px] text-foreground/50 font-body block mt-0.5 drop-shadow-sm">
               Due {format(new Date(task.due_date), 'MMM d')}
             </span>
           )}
@@ -189,29 +188,26 @@ export function SortableTask({ task }: SortableTaskProps) {
       {/* Expanded details panel */}
       {expanded && (
         <div
-          className="ml-6 mr-1 mb-2 mt-1 bg-black/15 border border-foreground/5 rounded-lg p-3 space-y-3 animate-accordion-down"
+          className="ml-6 mr-1 mb-2 mt-1 bg-black/25 border border-foreground/8 rounded-lg p-3 space-y-3 animate-accordion-down"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Description */}
           <div>
-            <label className="text-[9px] font-body text-foreground/40 uppercase tracking-wider block mb-1">Description</label>
+            <label className="text-[9px] font-body text-foreground/50 uppercase tracking-wider block mb-1 drop-shadow-sm">Description</label>
             <textarea
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               onBlur={handleSaveDescription}
               placeholder="Add a description..."
               rows={2}
-              className="w-full bg-black/15 border border-foreground/8 rounded-md px-2.5 py-1.5 text-xs font-body text-foreground/85 placeholder:text-foreground/25 outline-none focus:border-primary/30 resize-none shadow-inner transition-colors"
-              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+              className="w-full bg-black/20 border border-foreground/10 rounded-md px-2.5 py-1.5 text-xs font-body text-foreground/90 placeholder:text-foreground/30 outline-none focus:border-primary/30 resize-none shadow-inner transition-colors"
             />
           </div>
 
-          {/* Due date */}
           <div className="flex items-center gap-3">
-            <label className="text-[9px] font-body text-foreground/40 uppercase tracking-wider">Due date</label>
+            <label className="text-[9px] font-body text-foreground/50 uppercase tracking-wider drop-shadow-sm">Due date</label>
             <Popover>
               <PopoverTrigger asChild>
-                <button className="text-[10px] font-body text-foreground/60 bg-black/15 border border-foreground/8 px-2 py-1 rounded hover:bg-black/25 transition-colors">
+                <button className="text-[10px] font-body text-foreground/70 bg-black/20 border border-foreground/10 px-2 py-1 rounded hover:bg-black/30 transition-colors">
                   {task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : 'Set date'}
                 </button>
               </PopoverTrigger>
@@ -229,12 +225,11 @@ export function SortableTask({ task }: SortableTaskProps) {
             )}
           </div>
 
-          {/* Tags */}
           <div>
-            <label className="text-[9px] font-body text-foreground/40 uppercase tracking-wider block mb-1">Tags</label>
+            <label className="text-[9px] font-body text-foreground/50 uppercase tracking-wider block mb-1 drop-shadow-sm">Tags</label>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {(task.tags || []).map(tag => (
-                <span key={tag} className="inline-flex items-center gap-1 text-[9px] bg-primary/10 text-primary/70 px-2 py-0.5 rounded-full">
+                <span key={tag} className="inline-flex items-center gap-1 text-[9px] bg-primary/15 text-primary/70 px-2 py-0.5 rounded-full">
                   {tag}
                   <button onClick={() => handleRemoveTag(tag)} className="hover:text-destructive transition-colors">×</button>
                 </span>
@@ -246,7 +241,7 @@ export function SortableTask({ task }: SortableTaskProps) {
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
                 placeholder="Add tag..."
-                className="bg-black/15 border border-foreground/8 rounded px-2 py-1 text-[10px] font-body text-foreground/70 placeholder:text-foreground/25 outline-none focus:border-primary/30 w-28 shadow-inner transition-colors"
+                className="bg-black/20 border border-foreground/10 rounded px-2 py-1 text-[10px] font-body text-foreground/70 placeholder:text-foreground/30 outline-none focus:border-primary/30 w-28 shadow-inner transition-colors"
               />
             )}
           </div>
