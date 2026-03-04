@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function CaveSessionPanel() {
   const { mode, tasks, todayDayId } = usePlanner();
+  const isMobile = useIsMobile();
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [sprintLabel, setSprintLabel] = useState('');
   const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -22,7 +24,6 @@ export function CaveSessionPanel() {
     return () => clearInterval(interval);
   }, [mode]);
 
-  // Only render in cave mode
   if (mode !== 'cave') return null;
 
   const todayTasks = tasks.filter(t => t.date === todayDayId);
@@ -31,9 +32,32 @@ export function CaveSessionPanel() {
   const mins = Math.floor((sessionSeconds % 3600) / 60);
   const timeStr = hours > 0 ? `${hours}h ${mins.toString().padStart(2, '0')}m` : `${mins}m`;
 
+  if (isMobile) {
+    return (
+      <div className="fixed bottom-0 left-0 right-0 z-30 h-12 bg-black/60 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-display text-primary/90 tracking-tight" style={{ textShadow: '0 0 8px hsl(var(--primary) / 0.2)' }}>
+            {timeStr}
+          </span>
+          <span className="text-[8px] font-body text-foreground/40 uppercase tracking-widest">session</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-body text-foreground/50">
+            <span className="text-foreground/70">{completedToday}</span> done
+          </span>
+          {showBreakNudge && (
+            <button onClick={() => setShowBreakNudge(false)} className="text-[10px] text-primary/70 bg-primary/10 rounded-full px-2 py-0.5">
+              🌿 Break?
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed bottom-8 left-8 z-30 transition-all duration-700 ease-in-out">
-      <div className="glass-panel p-4 rounded-2xl bg-black/40 border-white/5 shadow-2xl backdrop-blur-md space-y-2 min-w-[180px]">
+    <div className="fixed bottom-8 right-8 z-30 transition-all duration-700 ease-in-out">
+      <div className="glass-panel p-4 rounded-2xl bg-black/50 border-white/8 shadow-2xl backdrop-blur-md space-y-2 min-w-[180px]">
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-display text-primary/90 tracking-tight" style={{ textShadow: '0 0 12px hsl(var(--primary) / 0.2)' }}>
             {timeStr}

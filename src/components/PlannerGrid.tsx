@@ -7,7 +7,6 @@ import type { Day } from "@/types/planner";
 import {
   DndContext,
   DragEndEvent,
-  DragOverEvent,
   closestCorners,
   PointerSensor,
   useSensor,
@@ -24,9 +23,7 @@ export function PlannerGrid() {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -43,16 +40,11 @@ export function PlannerGrid() {
     if (!activeTask) return;
 
     if (isOverDay) {
-      // Moving to a different day
-      if (activeTask.date !== overId) {
-        moveTask(taskId, overId);
-      }
+      if (activeTask.date !== overId) moveTask(taskId, overId);
     } else if (isOverTask) {
       const overTask = over.data.current?.task;
       if (!overTask) return;
-
       if (activeTask.date === overTask.date) {
-        // Reorder within same day
         const dayTasks = days.find(d => d.id === activeTask.date)?.tasks || [];
         const oldIndex = dayTasks.findIndex(t => t.id === taskId);
         const newIndex = dayTasks.findIndex(t => t.id === overId);
@@ -61,7 +53,6 @@ export function PlannerGrid() {
           reorderTasks(activeTask.date, newOrder.map(t => t.id));
         }
       } else {
-        // Move to different day
         moveTask(taskId, overTask.date);
       }
     }
@@ -74,14 +65,14 @@ export function PlannerGrid() {
   const activeTaskData = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
 
   return (
-    <div className="flex-1 p-4 overflow-y-auto relative">
+    <div className="flex-1 p-3 sm:p-4 overflow-y-auto relative pb-16 sm:pb-4">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-min transition-all duration-700 ${
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-min transition-all duration-700 ${
           zenMode ? "opacity-0 scale-95 pointer-events-none" : "opacity-100 scale-100"
         }`}>
           {days.slice(0, 4).map((day) => (
@@ -92,7 +83,6 @@ export function PlannerGrid() {
           ))}
         </div>
 
-        {/* Drag overlay */}
         <DragOverlay>
           {activeTaskData && (
             <div className="glass-panel px-3 py-2 rounded-md shadow-2xl backdrop-blur-xl border border-white/20 text-sm font-body text-foreground/90 max-w-[200px] truncate">

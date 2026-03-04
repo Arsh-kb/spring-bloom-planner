@@ -15,11 +15,8 @@ import { useKeyboardShortcuts, KeyboardCheatSheet } from '@/hooks/useKeyboardSho
 
 function IndexInner() {
   const { enterDeepFocus, tasks, todayDayId } = usePlanner();
-  const [journalOpen, setJournalOpen] = useState(false);
 
   const handleOpenJournal = useCallback(() => {
-    // Trigger journal sidebar or notebook - for now we'll use a click-simulation approach
-    // The header already has a button; this is for keyboard shortcut
     const btn = document.querySelector('[data-journal-btn]') as HTMLButtonElement;
     if (btn) btn.click();
   }, []);
@@ -56,12 +53,10 @@ function IndexInner() {
   );
 }
 
-const Index = () => {
-  return (
-    <PlannerProvider>
-      <IndexInner />
-    </PlannerProvider>
-  );
-};
+const Index = () => (
+  <PlannerProvider>
+    <IndexInner />
+  </PlannerProvider>
+);
 
 export default Index;
