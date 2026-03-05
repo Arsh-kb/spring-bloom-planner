@@ -185,10 +185,17 @@ export function SortableTask({ task }: SortableTaskProps) {
         </div>
       </div>
 
-      {/* Expanded details panel */}
-      {expanded && (
+      {/* Expanded details panel with smooth transition */}
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{
+          maxHeight: expanded ? '400px' : '0px',
+          opacity: expanded ? 1 : 0,
+          transform: expanded ? 'translateY(0)' : 'translateY(-4px)',
+        }}
+      >
         <div
-          className="ml-6 mr-1 mb-2 mt-1 bg-black/25 border border-foreground/8 rounded-lg p-3 space-y-3 animate-accordion-down"
+          className="ml-6 mr-1 mb-2 mt-1 bg-black/25 border border-foreground/8 rounded-lg p-3 space-y-3"
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div>
@@ -246,7 +253,7 @@ export function SortableTask({ task }: SortableTaskProps) {
             )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

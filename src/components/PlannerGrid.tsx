@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { usePlanner } from "@/context/PlannerContext";
 import { DayCard } from "./DayCard";
 import { MasterTaskList } from "./MasterTaskList";
@@ -14,13 +14,37 @@ import {
   DragOverlay,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function PlannerGrid() {
-  const { days, zenMode, moveTask, reorderTasks, tasks } = usePlanner();
+  const { days, zenMode, moveTask, reorderTasks, tasks, setWeekOffset } = usePlanner();
   const today = new Date().toISOString().split("T")[0];
   const [showMasterList, setShowMasterList] = useState(false);
   const [zoomedDay, setZoomedDay] = useState<Day | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
+
+  // Swipe gesture for week navigation
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    // Only trigger if horizontal swipe is dominant and > 80px
+    if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) setWeekOffset(prev => prev - 1); // swipe right = prev week
+      else setWeekOffset(prev => prev + 1); // swipe left = next week
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }, [setWeekOffset]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

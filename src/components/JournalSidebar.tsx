@@ -105,7 +105,7 @@ function JournalContent({ journalByDay, expandedDay, setExpandedDay, entry, setE
   handleSubmit: () => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col overflow-hidden px-4 sm:px-0">
+      <div className="flex-1 flex flex-col overflow-hidden px-4 sm:px-0 pb-16 sm:pb-0">
       <div className="flex-1 overflow-y-auto space-y-1 mb-4 scrollbar-thin">
         {journalByDay.map(({ day, entries }) => {
           const isExpanded = expandedDay === day.id;
