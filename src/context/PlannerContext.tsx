@@ -237,7 +237,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const toggleTask = useCallback((taskId: string) => setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, completed: !t.completed } : t)), [setTasks]);
 
   const addTask = useCallback((dateStr: string, title: string, priority: "low" | "medium" | "high", mood?: TaskMood, timeBlock?: TimeBlock, recurrence?: Task['recurrence']) => {
-    const newTask: Task = { id: `t${Date.now()}`, title, completed: false, priority, created_at: new Date().toISOString(), date: dateStr, mood, timeBlock, recurrence: recurrence || null };
+    const newTask: Task = { id: `t${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, title, completed: false, priority, created_at: new Date().toISOString(), date: dateStr, mood, timeBlock, recurrence: recurrence || null };
     setTasks((prev) => [...prev, newTask]);
   }, [setTasks]);
 
