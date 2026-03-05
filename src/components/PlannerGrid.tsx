@@ -89,7 +89,11 @@ export function PlannerGrid() {
   const activeTaskData = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
 
   return (
-    <div className="flex-1 p-3 sm:p-4 overflow-y-auto relative pb-16 sm:pb-4">
+    <div
+      className="flex-1 p-3 sm:p-4 overflow-y-auto relative pb-16 sm:pb-4"
+      onTouchStart={isMobile ? handleTouchStart : undefined}
+      onTouchEnd={isMobile ? handleTouchEnd : undefined}
+    >
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}

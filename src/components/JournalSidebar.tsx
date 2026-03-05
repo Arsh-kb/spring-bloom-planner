@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import woodTexture from '@/assets/wood-texture.jpg';
