@@ -10,6 +10,18 @@ export function JournalSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useIsMobile();
 
+  // Swipe-to-dismiss for mobile overlay
+  const touchStartY = useRef<number | null>(null);
+  const handleOverlayTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+  const handleOverlayTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (dy > 100) setIsOpen(false);
+    touchStartY.current = null;
+  }, []);
+
   const handleSubmit = () => {
     if (!entry.trim()) return;
     addJournalEntry(entry.trim(), todayDayId);
@@ -33,7 +45,7 @@ export function JournalSidebar() {
     </button>
   );
 
-  // Mobile: full-screen overlay
+  // Mobile: full-screen overlay with swipe-to-dismiss
   if (isMobile) {
     return (
       <>
@@ -46,8 +58,16 @@ export function JournalSidebar() {
         {isOpen && (
           <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
-            <div className="absolute inset-x-0 bottom-0 top-12 z-10 bg-background/95 rounded-t-2xl overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-foreground/10">
+            <div
+              className="absolute inset-x-0 bottom-0 top-12 z-10 bg-background/95 rounded-t-2xl overflow-hidden flex flex-col"
+              onTouchStart={handleOverlayTouchStart}
+              onTouchEnd={handleOverlayTouchEnd}
+            >
+              {/* Swipe indicator */}
+              <div className="flex justify-center pt-2 pb-1">
+                <div className="w-10 h-1 rounded-full bg-foreground/20" />
+              </div>
+              <div className="flex items-center justify-between px-4 py-2 border-b border-foreground/10">
                 <h2 className="font-display text-base text-foreground/90 drop-shadow-md">Field Journal</h2>
                 <button onClick={() => setIsOpen(false)} className="text-foreground/60 hover:text-foreground text-lg">×</button>
               </div>
