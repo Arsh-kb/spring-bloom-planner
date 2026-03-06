@@ -126,6 +126,10 @@ interface PlannerContextType {
   templates: TaskTemplate[];
   saveTemplate: (template: TaskTemplate) => void;
   deleteTemplate: (id: string) => void;
+
+  // Journal sidebar visibility
+  journalOpen: boolean;
+  setJournalOpen: (open: boolean) => void;
 }
 
 const PlannerContext = createContext<PlannerContextType | null>(null);
@@ -149,6 +153,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   // Deep Focus state
   const [deepFocusActive, setDeepFocusActive] = useState(false);
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
+  const [journalOpen, setJournalOpen] = useState(false);
 
   const todayDateObj = new Date();
   const todayDayId = `${todayDateObj.getFullYear()}-${String(todayDateObj.getMonth() + 1).padStart(2, "0")}-${String(todayDateObj.getDate()).padStart(2, "0")}`;
@@ -311,6 +316,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       deepFocusActive, focusTaskId, enterDeepFocus, exitDeepFocus,
       focusSessions, addFocusSession,
       templates, saveTemplate, deleteTemplate,
+      journalOpen, setJournalOpen,
     }}>
       {children}
     </PlannerContext.Provider>

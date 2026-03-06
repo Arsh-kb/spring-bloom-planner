@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Task, TaskMood, TimeBlock } from '@/types/planner';
@@ -37,6 +38,8 @@ function getAgingStyle(task: Task): React.CSSProperties {
 
 export function SortableTask({ task }: SortableTaskProps) {
   const { toggleTask, deleteTask, updateTask, updateTaskDetails, enterDeepFocus } = usePlanner();
+  const isMobile = useIsMobile();
+  const [hapticPulse, setHapticPulse] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
@@ -116,10 +119,17 @@ export function SortableTask({ task }: SortableTaskProps) {
 
         <button
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => toggleTask(task.id)}
+          onClick={() => {
+            toggleTask(task.id);
+            if (isMobile && !task.completed) {
+              setHapticPulse(true);
+              setTimeout(() => setHapticPulse(false), 300);
+            }
+          }}
           className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-500 shadow-sm ${
             task.completed ? 'border-primary/60 bg-primary/30 shadow-[0_0_8px_hsla(var(--primary)/0.4)]' : 'border-foreground/30 hover:border-foreground/60 bg-black/20'
-          }`}
+          } ${hapticPulse ? 'scale-150' : ''}`}
+          style={{ transition: hapticPulse ? 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)' : undefined }}
         >
           <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${task.completed ? 'bg-foreground/90 scale-100' : 'bg-transparent scale-0'}`} />
         </button>

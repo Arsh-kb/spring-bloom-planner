@@ -3,7 +3,7 @@ import { usePlanner } from '@/context/PlannerContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export function CaveSessionPanel() {
-  const { mode, tasks, todayDayId } = usePlanner();
+  const { mode, tasks, todayDayId, journalOpen } = usePlanner();
   const isMobile = useIsMobile();
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [sprintLabel, setSprintLabel] = useState('');
@@ -24,7 +24,7 @@ export function CaveSessionPanel() {
     return () => clearInterval(interval);
   }, [mode]);
 
-  if (mode !== 'cave') return null;
+  if (mode !== 'cave' || journalOpen) return null;
 
   const todayTasks = tasks.filter(t => t.date === todayDayId);
   const completedToday = todayTasks.filter(t => t.completed).length;
