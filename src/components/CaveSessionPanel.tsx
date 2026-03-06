@@ -24,7 +24,7 @@ export function CaveSessionPanel() {
     return () => clearInterval(interval);
   }, [mode]);
 
-  if (mode !== 'cave') return null;
+  if (mode !== 'cave' || journalOpen) return null;
 
   const todayTasks = tasks.filter(t => t.date === todayDayId);
   const completedToday = todayTasks.filter(t => t.completed).length;

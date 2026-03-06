@@ -4,10 +4,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import woodTexture from '@/assets/wood-texture.jpg';
 
 export function JournalSidebar() {
-  const { journal, addJournalEntry, days, todayDayId } = usePlanner();
+  const { journal, addJournalEntry, days, todayDayId, journalOpen: isOpen, setJournalOpen: setIsOpen } = usePlanner();
   const [entry, setEntry] = useState('');
   const [expandedDay, setExpandedDay] = useState<string | null>(todayDayId);
-  const [isOpen, setIsOpen] = useState(false);
   const isMobile = useIsMobile();
 
   // Swipe-to-dismiss for mobile overlay
