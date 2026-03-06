@@ -2,10 +2,10 @@ import { usePlanner } from '@/context/PlannerContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export function PomodoroTimer() {
-  const { mode, pomodoroMinutes, pomodoroSeconds, pomodoroActive, togglePomodoro, resetPomodoro, deepFocusActive } = usePlanner();
+  const { mode, pomodoroMinutes, pomodoroSeconds, pomodoroActive, togglePomodoro, resetPomodoro, deepFocusActive, journalOpen } = usePlanner();
   const isMobile = useIsMobile();
 
-  if (mode === 'cave' || deepFocusActive) return null;
+  if (mode === 'cave' || deepFocusActive || journalOpen) return null;
 
   const timeStr = `${pomodoroMinutes.toString().padStart(2, '0')}:${pomodoroSeconds.toString().padStart(2, '0')}`;
 

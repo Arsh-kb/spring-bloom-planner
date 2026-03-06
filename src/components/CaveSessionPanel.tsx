@@ -3,7 +3,7 @@ import { usePlanner } from '@/context/PlannerContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export function CaveSessionPanel() {
-  const { mode, tasks, todayDayId } = usePlanner();
+  const { mode, tasks, todayDayId, journalOpen } = usePlanner();
   const isMobile = useIsMobile();
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [sprintLabel, setSprintLabel] = useState('');
