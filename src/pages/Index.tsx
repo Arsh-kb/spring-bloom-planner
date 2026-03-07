@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { PlannerProvider, usePlanner } from '@/context/PlannerContext';
 import { Environment } from '@/components/Environment';
 import { PlannerHeader } from '@/components/PlannerHeader';
@@ -12,9 +12,17 @@ import { FocusPulse } from '@/components/FocusPulse';
 import { DeepFocusMode } from '@/components/DeepFocusMode';
 import { CaveSessionPanel } from '@/components/CaveSessionPanel';
 import { useKeyboardShortcuts, KeyboardCheatSheet } from '@/hooks/useKeyboardShortcuts';
+import { AIPlannerPanel } from '@/components/AIPlannerPanel';
 
 function IndexInner() {
   const { enterDeepFocus, tasks, todayDayId } = usePlanner();
+  const [showAIPlanner, setShowAIPlanner] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setShowAIPlanner(true);
+    window.addEventListener('open-ai-planner', handler);
+    return () => window.removeEventListener('open-ai-planner', handler);
+  }, []);
 
   const handleOpenJournal = useCallback(() => {
     const btn = document.querySelector('[data-journal-btn]') as HTMLButtonElement;
@@ -47,6 +55,7 @@ function IndexInner() {
       <CaveSessionPanel />
       <NatureGuest />
       <DeepFocusMode />
+      <AIPlannerPanel open={showAIPlanner} onClose={() => setShowAIPlanner(false)} />
 
       {showCheatSheet && <KeyboardCheatSheet onClose={() => setShowCheatSheet(false)} />}
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Day, TaskMood, TimeBlock, TaskRecurrence } from '@/types/planner';
 import { usePlanner } from '@/context/PlannerContext';
 import { useDroppable } from '@dnd-kit/core';
@@ -6,6 +6,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableTask } from './SortableTask';
 import { ShadowPlanning } from './ShadowPlanning';
 import { FloraGrowth } from './FloraGrowth';
+import { CompletionSparkle } from './CompletionSparkle';
 
 interface DayCardProps {
   day: Day;
@@ -40,6 +41,18 @@ export function DayCard({ day, isToday, onZoom }: DayCardProps) {
   const [timeBlock, setTimeBlock] = useState<TimeBlock | undefined>(undefined);
   const [recurrence, setRecurrence] = useState<TaskRecurrence | undefined>(undefined);
   const completedCount = day.tasks.filter(t => t.completed).length;
+  const allComplete = day.tasks.length > 0 && completedCount === day.tasks.length;
+  const [showSparkle, setShowSparkle] = useState(false);
+  const prevAllComplete = useRef(false);
+
+  useEffect(() => {
+    if (allComplete && !prevAllComplete.current) {
+      setShowSparkle(true);
+      const timer = setTimeout(() => setShowSparkle(false), 1500);
+      return () => clearTimeout(timer);
+    }
+    prevAllComplete.current = allComplete;
+  }, [allComplete]);
 
   const { setNodeRef, isOver } = useDroppable({ id: day.id, data: { type: 'Day', day } });
   const isVideo = day.image.endsWith('.mp4') || day.image.endsWith('.webm');
@@ -90,6 +103,7 @@ export function DayCard({ day, isToday, onZoom }: DayCardProps) {
       ${hasGhostDeadline ? 'ring-1 ring-destructive/15' : ''}`}
     >
       <FloraGrowth day={day} />
+      {showSparkle && <CompletionSparkle />}
 
       {/* --- Living Header --- */}
       <div className="relative h-20 sm:h-24 overflow-hidden flex-shrink-0 cursor-pointer" onClick={handleHeaderClick}>
