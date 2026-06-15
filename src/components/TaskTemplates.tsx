@@ -70,7 +70,8 @@ const builtInTemplates: TaskTemplate[] = [
       { title: 'Retrospective & feedback', priority: 'medium', mood: 'reflective', timeBlock: 'afternoon', dayIndex: 4 },
     ],
   },
-  ,jujharTemplate];
+  jujharTemplate,
+];
 
 export function TaskTemplates() {
   const { tasks, currentWeekDates, addTask, templates, saveTemplate, deleteTemplate } = usePlanner();
