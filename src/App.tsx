@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import FocusGate from "./pages/FocusGate";
+import { FocusGateProvider } from "./context/FocusGateContext";
 
 const queryClient = new QueryClient();
 
@@ -14,11 +16,14 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <FocusGateProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/gate" element={<FocusGate />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </FocusGateProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

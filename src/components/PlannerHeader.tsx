@@ -116,6 +116,9 @@ export function PlannerHeader() {
               <button onClick={() => { window.dispatchEvent(new Event('open-ai-planner')); setShowMobileMenu(false); }} className="w-full px-3 py-2.5 text-left text-xs font-body text-foreground/70 rounded-lg hover:bg-white/5 flex items-center gap-2.5">
                 🤖 AI Planner
               </button>
+              <a href="/gate" onClick={() => setShowMobileMenu(false)} className="w-full px-3 py-2.5 text-left text-xs font-body text-foreground/70 rounded-lg hover:bg-white/5 flex items-center gap-2.5">
+                🔒 Focus Gate
+              </a>
             </div>
           </div>
         )}
@@ -176,6 +179,9 @@ export function PlannerHeader() {
           <button onClick={() => window.dispatchEvent(new Event('open-ai-planner'))} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm" title="AI Planner">
             🤖
           </button>
+          <a href="/gate" className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm" title="Focus Gate (App Lock)">
+            🔒
+          </a>
 
           <div ref={toolsMenuRef} className="relative">
             <button onClick={() => { setShowToolsMenu(!showToolsMenu); setShowModeMenu(false); }} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm">

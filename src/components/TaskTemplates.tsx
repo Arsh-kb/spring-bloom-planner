@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
 import type { TaskTemplate } from '@/types/planner';
+import { jujharTemplate } from '@/data/jujharTemplate';
+
+
 
 const builtInTemplates: TaskTemplate[] = [
   {
@@ -67,6 +70,7 @@ const builtInTemplates: TaskTemplate[] = [
       { title: 'Retrospective & feedback', priority: 'medium', mood: 'reflective', timeBlock: 'afternoon', dayIndex: 4 },
     ],
   },
+  jujharTemplate,
 ];
 
 export function TaskTemplates() {
