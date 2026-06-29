@@ -113,8 +113,8 @@ export function PlannerHeader() {
               <button onClick={() => { toggleMute(); setShowMobileMenu(false); }} className="w-full px-3 py-2.5 text-left text-xs font-body text-foreground/70 rounded-lg hover:bg-white/5 flex items-center gap-2.5">
                 {muted ? '🔇 Unmute' : '🔊 Mute'}
               </button>
-              <button onClick={() => { window.dispatchEvent(new Event('open-ai-planner')); setShowMobileMenu(false); }} className="w-full px-3 py-2.5 text-left text-xs font-body text-foreground/70 rounded-lg hover:bg-white/5 flex items-center gap-2.5">
-                🤖 AI Planner
+              <button onClick={() => { window.dispatchEvent(new Event('open-ai-planner')); setShowMobileMenu(false); }} className="w-full px-3 py-2.5 text-left text-xs font-body text-foreground/90 rounded-lg hover:bg-primary/15 flex items-center gap-2.5">
+                ✦ Chief of Staff
               </button>
               <a href="/gate" onClick={() => setShowMobileMenu(false)} className="w-full px-3 py-2.5 text-left text-xs font-body text-foreground/70 rounded-lg hover:bg-white/5 flex items-center gap-2.5">
                 🔒 Focus Gate
@@ -176,8 +176,8 @@ export function PlannerHeader() {
           <button onClick={() => enterDeepFocus(todayFirstTask?.id)} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm" title="Deep Focus (D)">
             🎯
           </button>
-          <button onClick={() => window.dispatchEvent(new Event('open-ai-planner'))} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm" title="AI Planner">
-            🤖
+          <button onClick={() => window.dispatchEvent(new Event('open-ai-planner'))} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/90 hover:text-foreground hover:bg-primary/15 shadow-sm ring-1 ring-primary/30" title="Chief of Staff (AI)">
+            ✦ Chief
           </button>
           <a href="/gate" className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm" title="Focus Gate (App Lock)">
             🔒
