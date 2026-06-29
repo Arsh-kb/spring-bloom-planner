@@ -133,7 +133,13 @@ export function DeepFocusMode() {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-sm animate-fade-in">
+      {/* Ambient light rays for deep focus */}
+      {pomodoroActive && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-primary/5 to-transparent rotate-[-15deg] transform origin-top" style={{ animation: 'focus-light-pulse 8s ease-in-out infinite' }} />
+        </div>
+      )}
       <div className="flex flex-col items-center gap-8">
         {/* Timer ring */}
         <div className="relative">

@@ -10,6 +10,9 @@ import { generateWeekTitle } from '@/lib/narrativeEngine';
 import { useCircadianRhythm } from '@/hooks/useCircadianRhythm';
 import { useAmbientSound } from '@/hooks/useAmbientSound';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from '@/hooks/use-toast';
+import { getDemoData, getDemoConfidence } from '@/data/demoWorkspace';
 
 const modes: { id: LightingMode; label: string; icon: string }[] = [
   { id: 'sun', label: 'Golden Hour', icon: '☀️' },
@@ -19,7 +22,7 @@ const modes: { id: LightingMode; label: string; icon: string }[] = [
 ];
 
 export function PlannerHeader() {
-  const { mode, setMode, zenMode, toggleZenMode, weekOffset, setWeekOffset, tasks, journal, season, currentWeekDates, enterDeepFocus, todayDayId } = usePlanner();
+  const { mode, setMode, zenMode, toggleZenMode, weekOffset, setWeekOffset, tasks, journal, season, currentWeekDates, enterDeepFocus, todayDayId, confidence, runRecovery, checkAndReschedule, aiLoading, computeConfidence, explanations, restoreData, setConfidence } = usePlanner();
   const [showVault, setShowVault] = useState(false);
   const [showNotebook, setShowNotebook] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -27,6 +30,7 @@ export function PlannerHeader() {
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [demoModeLoaded, setDemoModeLoaded] = useState(false);
   const modeMenuRef = useRef<HTMLDivElement>(null);
   const toolsMenuRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -36,6 +40,35 @@ export function PlannerHeader() {
   const { muted, toggleMute } = useAmbientSound(mode);
 
   const todayFirstTask = tasks.find(t => t.date === todayDayId && !t.completed);
+  const overdueTasks = tasks.filter(t => !t.completed && t.date < todayDayId);
+  const lastExplanation = explanations[explanations.length - 1];
+
+  // Confidence color based on score
+  const confidenceColor = confidence ? (
+    confidence.overall >= 70 ? 'text-green-400' :
+    confidence.overall >= 40 ? 'text-yellow-400' :
+    'text-red-400'
+  ) : 'text-foreground/50';
+
+  const momentumIcon = confidence?.momentum === 'up' ? '↑' : confidence?.momentum === 'down' ? '↓' : '→';
+
+  // Auto-reschedule check
+  const [autoRescheduleNotified, setAutoRescheduleNotified] = useState(false);
+  useEffect(() => {
+    if (overdueTasks.length > 0 && !aiLoading && !autoRescheduleNotified) {
+      setAutoRescheduleNotified(true);
+      const timer = setTimeout(async () => {
+        const success = await checkAndReschedule();
+        if (success) {
+          toast({
+            title: "I reorganized your remaining week",
+            description: `Found ${overdueTasks.length} overdue tasks. I've rescheduled them to available focus windows.`,
+          });
+        }
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [overdueTasks.length, autoRescheduleNotified, aiLoading]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -153,6 +186,67 @@ export function PlannerHeader() {
 
           <WeeklyStreakDots />
 
+          {/* AI Confidence Indicator */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => computeConfidence()}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all"
+                >
+                  <span className="text-[10px] font-body text-foreground/60">Confidence</span>
+                  <span className={`text-xs font-display ${confidenceColor}`}>
+                    {confidence ? `${Math.round(confidence.overall)}%` : '--%'}
+                  </span>
+                  {confidence && (
+                    <span className={`text-[9px] ${confidence.momentum === 'up' ? 'text-green-400' : confidence.momentum === 'down' ? 'text-red-400' : 'text-foreground/50'}`}>
+                      {momentumIcon}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="glass-panel bg-black/80 border border-white/10 px-3 py-2">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-foreground/60">AI Confidence Score</p>
+                  {confidence && (
+                    <>
+                      <p className="text-xs text-foreground">{confidence.completedToday}/{confidence.totalToday} tasks done today</p>
+                      <p className="text-xs text-foreground/70">{confidence.overdueCount} overdue</p>
+                      {confidence.riskTasks > 0 && (
+                        <p className="text-xs text-yellow-400">{confidence.riskTasks} high-risk tasks</p>
+                      )}
+                    </>
+                  )}
+                  {lastExplanation && (
+                    <p className="text-[9px] text-foreground/50 mt-2 pt-2 border-t border-white/10 italic">"{lastExplanation.reason}"</p>
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Recovery Button - show when overwhelmed */}
+          {(confidence && confidence.overall < 40 || overdueTasks.length > 2) && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => runRecovery()}
+                    disabled={aiLoading}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 transition-all animate-pulse hover:scale-105 active:scale-95"
+                  >
+                    <span className="text-xs">🌱</span>
+                    <span className="text-[10px] font-body text-green-400">Recover</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="glass-panel bg-black/80 border border-green-500/30 px-3 py-2">
+                  <p className="text-xs text-foreground">Your schedule needs attention.</p>
+                  <p className="text-[10px] text-green-400 mt-1">Click to rebuild it intelligently.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           <span className="font-display text-[10px] italic text-foreground/50 tracking-wider hidden lg:inline drop-shadow-md">{season.label}</span>
 
           {suggestedMode !== mode && (
@@ -179,6 +273,34 @@ export function PlannerHeader() {
           <button onClick={() => window.dispatchEvent(new Event('open-ai-planner'))} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/90 hover:text-foreground hover:bg-primary/15 shadow-sm ring-1 ring-primary/30" title="Chief of Staff (AI)">
             ✦ Chief
           </button>
+          {!demoModeLoaded && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      const demo = getDemoData();
+                      restoreData(demo.tasks, demo.journal);
+                      setDemoModeLoaded(true);
+                      setConfidence(getDemoConfidence());
+                      toast({
+                        title: "Demo workspace loaded",
+                        description: "Ready to showcase the AI Executive Assistant.",
+                      });
+                    }}
+                    className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-green-400 hover:bg-green-500/10 shadow-sm"
+                    title="Load Demo (for presentations)"
+                  >
+                    🚀
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="glass-panel bg-black/80 border border-white/10 px-3 py-2">
+                  <p className="text-xs text-foreground">Load demo workspace</p>
+                  <p className="text-[10px] text-foreground/50">Showcase AI features</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           <a href="/gate" className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm" title="Focus Gate (App Lock)">
             🔒
           </a>

@@ -100,3 +100,58 @@ export interface PlannerState {
   deepFocusActive: boolean;
   focusTaskId: string | null;
 }
+
+// ===== AI Executive Assistant Types =====
+
+export type TaskRisk = 'low' | 'medium' | 'high';
+
+export interface AIExplanation {
+  id: string;
+  action: 'move' | 'reschedule' | 'priority_change' | 'split' | 'recovery' | 'reflection' | 'risk_warning';
+  taskId?: string;
+  reason: string;
+  confidence: number;
+  timestamp: string;
+  model: string;
+  details?: Record<string, unknown>;
+}
+
+export interface PlannerSnapshot {
+  id: string;
+  timestamp: string;
+  tasks: Task[];
+  journal: JournalEntry[];
+  description: string;
+}
+
+export interface ConfidenceScore {
+  overall: number;
+  momentum: 'up' | 'flat' | 'down';
+  completedToday: number;
+  totalToday: number;
+  overdueCount: number;
+  riskTasks: number;
+}
+
+export interface RecoveryProposal {
+  summary: string;
+  changes: Array<{
+    type: 'move' | 'remove' | 'reschedule';
+    taskId: string;
+    fromDate: string;
+    toDate?: string;
+    reason: string;
+  }>;
+  newConfidence: number;
+  oldConfidence: number;
+}
+
+export interface MissionReport {
+  completionProbability: number;
+  deepWorkHours: number;
+  recoveryTime: number;
+  highRiskTasks: number;
+  protectedFocusBlocks: number;
+  schedulingStrategy: string;
+  generatedAt: string;
+}

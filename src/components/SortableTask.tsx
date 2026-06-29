@@ -37,9 +37,15 @@ function getAgingStyle(task: Task): React.CSSProperties {
 }
 
 export function SortableTask({ task }: SortableTaskProps) {
-  const { toggleTask, deleteTask, updateTask, updateTaskDetails, enterDeepFocus } = usePlanner();
+  const { toggleTask, deleteTask, updateTask, updateTaskDetails, enterDeepFocus, taskRisks, computeTaskRisk, todayDayId } = usePlanner();
   const isMobile = useIsMobile();
   const [hapticPulse, setHapticPulse] = useState(false);
+  const taskRisk = taskRisks[task.id];
+
+  // Compute risk for high priority incomplete tasks
+  const risk = taskRisk || (task.priority === 'high' && !task.completed ? 'medium' : 'low');
+  const riskColor = risk === 'high' ? 'text-red-400' : risk === 'medium' ? 'text-yellow-400' : 'text-green-400';
+  const riskDot = risk === 'high' ? 'bg-red-400' : risk === 'medium' ? 'bg-yellow-400' : 'bg-green-400';
 
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
@@ -114,6 +120,14 @@ export function SortableTask({ task }: SortableTaskProps) {
           )}
           {task.recurrence && (
             <span className="text-[8px] text-foreground/40 ml-0.5" title={`Recurs: ${task.recurrence}`}>↻</span>
+          )}
+          {/* Risk indicator for high priority tasks */}
+          {!task.completed && task.priority === 'high' && (
+            <span
+              className={`ml-0.5 w-1.5 h-1.5 rounded-full ${riskDot} cursor-help`}
+              title={`Risk: ${risk}`}
+              onClick={(e) => { e.stopPropagation(); computeTaskRisk(task.id); }}
+            />
           )}
         </div>
 

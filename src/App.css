@@ -40,3 +40,27 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Deep Focus Light Pulse */
+@keyframes focus-light-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translateX(-50%) rotate(-15deg) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateX(-50%) rotate(-15deg) scale(1.05);
+  }
+}
+
+/* Focus Breathe Animation */
+@keyframes focus-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.95;
+  }
+}
