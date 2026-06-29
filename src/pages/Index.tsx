@@ -12,7 +12,7 @@ import { FocusPulse } from '@/components/FocusPulse';
 import { DeepFocusMode } from '@/components/DeepFocusMode';
 import { CaveSessionPanel } from '@/components/CaveSessionPanel';
 import { useKeyboardShortcuts, KeyboardCheatSheet } from '@/hooks/useKeyboardShortcuts';
-import { AIPlannerPanel } from '@/components/AIPlannerPanel';
+import { ChiefPanel } from '@/components/agent/ChiefPanel';
 
 function IndexInner() {
   const { enterDeepFocus, tasks, todayDayId } = usePlanner();
@@ -55,7 +55,7 @@ function IndexInner() {
       <CaveSessionPanel />
       <NatureGuest />
       <DeepFocusMode />
-      <AIPlannerPanel open={showAIPlanner} onClose={() => setShowAIPlanner(false)} />
+      <ChiefPanel open={showAIPlanner} onClose={() => setShowAIPlanner(false)} />
 
       {showCheatSheet && <KeyboardCheatSheet onClose={() => setShowCheatSheet(false)} />}
     </div>
