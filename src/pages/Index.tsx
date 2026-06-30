@@ -143,10 +143,6 @@ function LivingWorldToast({ event, index }: { event: LivingEvent; index: number 
   );
 }
 
-const Index = () => (
-  <PlannerProvider>
-    <IndexInner />
-  </PlannerProvider>
-);
+const Index = () => <IndexInner />;
 
 export default Index;
