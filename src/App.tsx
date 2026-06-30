@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import FocusGate from "./pages/FocusGate";
 import { FocusGateProvider } from "./context/FocusGateContext";
+import { PlannerProvider } from "./context/PlannerContext";
 
 const queryClient = new QueryClient();
 
