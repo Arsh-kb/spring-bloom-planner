@@ -17,14 +17,16 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <FocusGateProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/gate" element={<FocusGate />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </FocusGateProvider>
+        <PlannerProvider>
+          <FocusGateProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/gate" element={<FocusGate />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </FocusGateProvider>
+        </PlannerProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
