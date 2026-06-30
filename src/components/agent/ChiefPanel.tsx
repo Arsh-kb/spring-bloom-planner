@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { usePlanner } from '@/context/PlannerContext';
-import { toast } from '@/hooks/use-toast';
-import type { TaskMood, TaskPriority, TimeBlock, MissionReport } from '@/types/planner';
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { usePlanner } from "@/context/PlannerContext";
+import { toast } from "@/hooks/use-toast";
+import type { TaskMood, TaskPriority, TimeBlock } from "@/types/planner";
 
 interface ChiefPanelProps {
   open: boolean;
   onClose: () => void;
 }
 
+// ============ TYPES ============
 interface Briefing {
   greeting: string;
   workloadHours: number;
@@ -55,197 +56,451 @@ interface MissionReport {
   schedulingStrategy: string;
 }
 
-type Tab = 'briefing' | 'breakdown' | 'schedule' | 'report';
+interface Notification {
+  id: string;
+  type: "info" | "warning" | "success" | "tip";
+  message: string;
+  timestamp: number;
+}
 
-// AI Thinking messages for personality
-const thinkingMessages = {
+type Tab = "briefing" | "breakdown" | "schedule" | "report" | "chat";
+
+// ============ THINKING ANIMATION STEPS ============
+interface ThinkingStep {
+  id: string;
+  text: string;
+  emoji: string;
+}
+
+const thinkingSteps = {
   briefing: [
-    { text: "Reading your workload...", delay: 0 },
-    { text: "Analyzing focus patterns...", delay: 800 },
-    { text: "Preparing recommendations...", delay: 1600 },
+    { id: "1", text: "Reading your workload", emoji: "📋" },
+    { id: "2", text: "Analyzing focus patterns", emoji: "🧠" },
+    { id: "3", text: "Checking deadlines", emoji: "⏰" },
+    { id: "4", text: "Preparing recommendations", emoji: "✨" },
   ],
   breakdown: [
-    { text: "Understanding your goal...", delay: 0 },
-    { text: "Breaking into actionable steps...", delay: 600 },
-    { text: "Estimating effort...", delay: 1200 },
+    { id: "1", text: "Understanding your goal", emoji: "🎯" },
+    { id: "2", text: "Breaking into steps", emoji: "✂️" },
+    { id: "3", text: "Estimating effort", emoji: "⏱️" },
+    { id: "4", text: "Finding focus windows", emoji: "🌅" },
   ],
   schedule: [
-    { text: "Reading your workload...", delay: 0 },
-    { text: "Finding focus windows...", delay: 800 },
-    { text: "Balancing the week...", delay: 1600 },
-    { text: "Protecting breaks...", delay: 2400 },
+    { id: "1", text: "Analyzing workload", emoji: "📊" },
+    { id: "2", text: "Finding focus windows", emoji: "🧠" },
+    { id: "3", text: "Balancing the week", emoji: "⚖️" },
+    { id: "4", text: "Protecting deep work", emoji: "🛡️" },
+    { id: "5", text: "Negotiating deadlines", emoji: "🤝" },
+    { id: "6", text: "Finalizing schedule", emoji: "📋" },
   ],
   recovery: [
-    { text: "Analyzing current state...", delay: 0 },
-    { text: "Identifying conflicts...", delay: 700 },
-    { text: "Rebuilding the schedule...", delay: 1400 },
+    { id: "1", text: "Analyzing current state", emoji: "🔍" },
+    { id: "2", text: "Identifying conflicts", emoji: "⚠️" },
+    { id: "3", text: "Protecting priorities", emoji: "🎯" },
+    { id: "4", text: "Rebuilding schedule", emoji: "🔨" },
+    { id: "5", text: "Finalizing recovery", emoji: "🌱" },
   ],
 };
 
-// Premium AI messages
-const aiMessages = {
-  scheduleGenerated: "I reorganized your week to protect your highest-priority goals.",
-  taskMoved: "I noticed today became overloaded, so I shifted this to when you'll have better focus.",
-  recoveryComplete: "I've rebuilt your schedule to be realistic while preserving important deadlines.",
-  briefingReady: "Here's your morning overview.",
+// ============ PROACTIVE NOTIFICATIONS ============
+const generateProactiveNotifications = (
+  tasks: ReturnType<typeof usePlanner>["tasks"],
+  todayDayId: string,
+): Notification[] => {
+  const notifications: Notification[] = [];
+  const today = new Date().toISOString().split("T")[0];
+
+  // Get today's tasks
+  const todayTasks = tasks.filter((t) => t.date === todayDayId);
+  const incompleteToday = todayTasks.filter((t) => !t.completed);
+  const highPriorityToday = incompleteToday.filter(
+    (t) => t.priority === "high",
+  );
+  const completedToday = todayTasks.filter((t) => t.completed);
+
+  // Calculate today's workload
+  const totalToday = todayTasks.length;
+  const completedCount = completedToday.length;
+  const completionRate =
+    totalToday > 0 ? (completedCount / totalToday) * 100 : 0;
+
+  // Check for overloaded day
+  if (incompleteToday.length >= 5) {
+    notifications.push({
+      id: "overloaded",
+      type: "warning",
+      message: `Tuesday is overloaded — ${incompleteToday.length} tasks remaining. Want me to rebalance?`,
+      timestamp: Date.now(),
+    });
+  }
+
+  // Check for high-risk tasks
+  if (highPriorityToday.length >= 2) {
+    notifications.push({
+      id: "high-risk",
+      type: "info",
+      message: `You have ${highPriorityToday.length} high-priority tasks. Let's prioritize those first.`,
+      timestamp: Date.now(),
+    });
+  }
+
+  // Check for missed tasks
+  const missedTasks = tasks.filter((t) => !t.completed && t.date < todayDayId);
+  if (missedTasks.length > 0) {
+    notifications.push({
+      id: "missed",
+      type: "tip",
+      message: `${missedTasks.length} tasks from earlier days are pending. I can help reschedule them.`,
+      timestamp: Date.now(),
+    });
+  }
+
+  // Low completion rate
+  if (completionRate < 30 && totalToday > 0) {
+    notifications.push({
+      id: "low-progress",
+      type: "info",
+      message: `Only ${Math.round(completionRate)}% of today done. Let's focus on what matters most.`,
+      timestamp: Date.now(),
+    });
+  }
+
+  // Empty morning
+  const morningTasks = incompleteToday.filter((t) => t.timeBlock === "morning");
+  if (morningTasks.length === 0 && incompleteToday.length > 0) {
+    notifications.push({
+      id: "no-morning",
+      type: "tip",
+      message:
+        "No deep work planned for morning — want me to protect a focus block?",
+      timestamp: Date.now(),
+    });
+  }
+
+  return notifications;
 };
 
-const priEmoji: Record<string, string> = { high: '🍒', medium: '🌿', low: '🍂' };
-const blockEmoji: Record<string, string> = { morning: '🌅', afternoon: '☀️', evening: '🌙' };
+// ============ GREETINGS BY TIME ============
+const getTimeBasedGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+};
+
+// ============ EMOJI MAPPING ============
+const priEmoji: Record<string, string> = {
+  high: "🍒",
+  medium: "🌿",
+  low: "🍂",
+};
+const blockEmoji: Record<string, string> = {
+  morning: "🌅",
+  afternoon: "☀️",
+  evening: "🌙",
+};
 
 export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
-  const { tasks, addTask, mode, currentWeekDates, todayDayId, days, createSnapshot, restoreSnapshot, snapshots, addExplanation, focusSessions } = usePlanner();
-  const [tab, setTab] = useState<Tab>('briefing');
+  const {
+    tasks,
+    addTask,
+    mode,
+    currentWeekDates,
+    todayDayId,
+    days,
+    createSnapshot,
+    restoreSnapshot,
+    snapshots,
+    addExplanation,
+    focusSessions,
+  } = usePlanner();
+
+  // State
+  const [tab, setTab] = useState<Tab>("briefing");
   const [loading, setLoading] = useState(false);
-  const [thinkingMessage, setThinkingMessage] = useState('');
+  const [thinkingStep, setThinkingStep] = useState<string>("");
+  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [briefingDate, setBriefingDate] = useState<string | null>(null);
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
-  const [missionReport, setMissionReport] = useState<MissionReport | null>(null);
-  const [goalInput, setGoalInput] = useState('');
-  const [scheduleInput, setScheduleInput] = useState('');
+  const [missionReport, setMissionReport] = useState<MissionReport | null>(
+    null,
+  );
+
+  const [goalInput, setGoalInput] = useState("");
+  const [scheduleInput, setScheduleInput] = useState("");
   const [accepted, setAccepted] = useState<Set<string>>(new Set());
   const [lastAction, setLastAction] = useState<string | null>(null);
 
-  const todayIdx = useMemo(() => currentWeekDates.indexOf(todayDayId), [currentWeekDates, todayDayId]);
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
 
+  // Proactive notifications
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [dismissedNotifications, setDismissedNotifications] = useState<
+    Set<string>
+  >(new Set());
+
+  const todayIdx = useMemo(
+    () => currentWeekDates.indexOf(todayDayId),
+    [currentWeekDates, todayDayId],
+  );
+
+  // Generate notifications when panel opens
+  useEffect(() => {
+    if (open) {
+      const newNotifications = generateProactiveNotifications(
+        tasks,
+        todayDayId,
+      );
+      const visible = newNotifications.filter(
+        (n) => !dismissedNotifications.has(n.id),
+      );
+      setNotifications(visible);
+
+      // Show toast for first notification if exists
+      if (visible.length > 0 && !localStorage.getItem("chief-notified-today")) {
+        toast({
+          title: "Chief of Staff",
+          description: visible[0].message,
+        });
+        localStorage.setItem("chief-notified-today", "true");
+      }
+    } else {
+      // Reset notification flag when panel closes (allows new notifications next open)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, tasks, todayDayId]);
+
+  // Reset notification flag at midnight
+  useEffect(() => {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const msUntilMidnight = midnight.getTime() - now.getTime();
+
+    const timer = setTimeout(() => {
+      localStorage.removeItem("chief-notified-today");
+    }, msUntilMidnight);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Dismiss notification
+  const dismissNotification = useCallback((id: string) => {
+    setDismissedNotifications((prev) => new Set(prev).add(id));
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  // Think animation runner
+  const runThinkingAnimation = useCallback(
+    (type: keyof typeof thinkingSteps) => {
+      const steps = thinkingSteps[type];
+      setCompletedSteps(new Set());
+      setCurrentStepIndex(0);
+
+      steps.forEach((step, index) => {
+        setTimeout(() => {
+          setCurrentStepIndex(index);
+          setThinkingStep(step.text);
+          setCompletedSteps((prev) => new Set(prev).add(step.id));
+        }, index * 800);
+      });
+
+      return steps.length * 800;
+    },
+    [],
+  );
+
+  // Invoke AI function
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const invoke = async (action: string, payload: Record<string, unknown>) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chief', {
+      const { data, error } = await supabase.functions.invoke("ai-chief", {
         body: { action, ...payload },
       });
       if (error) throw error;
       if (data?.error) {
-        if (data.kind === 'credit_exhausted') {
-          toast({ title: 'AI at capacity', description: 'Please add credits in workspace settings to continue.', variant: 'destructive' });
-        } else if (data.kind === 'rate_limit') {
-          toast({ title: 'AI is handling another request', description: 'Give me just a moment to finish up.' });
+        if (data.kind === "rate_limit") {
+          toast({
+            title: "AI is handling another request",
+            description: "Give me just a moment to finish up.",
+          });
         } else {
-          toast({ title: 'Something unexpected happened', description: 'Let me try again.', variant: 'destructive' });
+          toast({
+            title: "Something unexpected happened",
+            description: data.error || "Let me try again.",
+            variant: "destructive",
+          });
         }
         return null;
       }
       return data;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      toast({ title: 'Connection issue', description: 'Please check your connection and try again.', variant: 'destructive' });
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast({
+        title: "Connection issue",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setLoading(false);
-      setThinkingMessage('');
+      setThinkingStep("");
+      setCompletedSteps(new Set());
+      setCurrentStepIndex(0);
     }
   };
 
-  // Auto-run morning briefing once per day when panel opens
+  // Auto-run morning briefing
   useEffect(() => {
     if (!open) return;
-    if (tab !== 'briefing') return;
+    if (tab !== "briefing") return;
     if (briefingDate === todayDayId && briefing) return;
+
     (async () => {
       setLoading(true);
-      // Thinking animation
-      for (const msg of thinkingMessages.briefing) {
-        await new Promise(r => setTimeout(r, msg.delay));
-        setThinkingMessage(msg.text);
-      }
-      const data = await invoke('briefing', {
-        tasks: tasks.map(t => ({ id: t.id, title: t.title, date: t.date, completed: t.completed, priority: t.priority, mood: t.mood, timeBlock: t.timeBlock })),
+      await runThinkingAnimation("briefing");
+
+      const data = await invoke("briefing", {
+        tasks: tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          date: t.date,
+          completed: t.completed,
+          priority: t.priority,
+          mood: t.mood,
+          timeBlock: t.timeBlock,
+        })),
         todayDate: todayDayId,
         mode,
       });
+
       if (data) {
-        setBriefing(data as Briefing);
+        setBriefing(data.data || data);
         setBriefingDate(todayDayId);
-        setThinkingMessage('');
       }
       setLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, tab, todayDayId]);
+  }, [
+    open,
+    tab,
+    todayDayId,
+    briefingDate,
+    briefing,
+    tasks,
+    mode,
+    invoke,
+    runThinkingAnimation,
+  ]);
 
   const handleBreakdown = async () => {
     if (!goalInput.trim()) return;
     setLoading(true);
     setBreakdown(null);
     setAccepted(new Set());
-    // Thinking animation
-    for (const msg of thinkingMessages.breakdown) {
-      await new Promise(r => setTimeout(r, msg.delay));
-      setThinkingMessage(msg.text);
-    }
-    const data = await invoke('breakdown', {
+
+    await runThinkingAnimation("breakdown");
+
+    const data = await invoke("breakdown", {
       goal: goalInput,
       todayDate: todayDayId,
       weekDates: currentWeekDates,
     });
-    if (data) setBreakdown(data as Breakdown);
+
+    if (data) setBreakdown(data.data || data);
     setLoading(false);
-    setThinkingMessage('');
   };
 
   const handleSchedule = async () => {
     if (!scheduleInput.trim()) return;
     setLoading(true);
-    createSnapshot('Before AI scheduling');
+    createSnapshot("Before AI scheduling");
     setSchedule(null);
     setAccepted(new Set());
     setMissionReport(null);
-    // Thinking animation
-    for (const msg of thinkingMessages.schedule) {
-      await new Promise(r => setTimeout(r, msg.delay));
-      setThinkingMessage(msg.text);
-    }
-    const data = await invoke('schedule', {
+
+    await runThinkingAnimation("schedule");
+
+    const data = await invoke("schedule", {
       goals: scheduleInput,
       todayDate: todayDayId,
       weekDates: currentWeekDates,
-      existingTasks: tasks.filter(t => currentWeekDates.includes(t.date)).map(t => ({ title: t.title, date: t.date, completed: t.completed })),
+      existingTasks: tasks
+        .filter((t) => currentWeekDates.includes(t.date))
+        .map((t) => ({ title: t.title, date: t.date, completed: t.completed })),
     });
-    if (data) {
-      const scheduleData = data as Schedule;
-      setSchedule(scheduleData);
-      setLastAction('schedule');
 
-      // Also get mission report
-      const reportData = await invoke('mission_report', {
-        tasks: tasks.filter(t => currentWeekDates.includes(t.date)).map(t => ({ id: t.id, title: t.title, date: t.date, completed: t.completed, priority: t.priority, timeBlock: t.timeBlock })),
+    if (data) {
+      const scheduleData = (data.data || data) as Schedule;
+      setSchedule(scheduleData);
+      setLastAction("schedule");
+
+      const reportData = await invoke("mission_report", {
+        tasks: tasks
+          .filter((t) => currentWeekDates.includes(t.date))
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            date: t.date,
+            completed: t.completed,
+            priority: t.priority,
+            timeBlock: t.timeBlock,
+          })),
         todayDate: todayDayId,
         weekDates: currentWeekDates,
         focusSessions,
       });
+
       if (reportData) {
-        setMissionReport(reportData as MissionReport);
+        setMissionReport((reportData.data || reportData) as MissionReport);
       }
 
-      // Add explanation
       addExplanation({
-        action: 'reschedule',
-        reason: scheduleData.rationale,
+        action: "reschedule",
+        reason: scheduleData?.rationale || "Schedule optimized.",
         confidence: 85,
-        model: 'gemini-2.5-pro',
+        model: "gemini-1.5-pro",
       });
     }
     setLoading(false);
-    setThinkingMessage('');
   };
 
   const dateForOffset = (offset: number) => {
     const base = todayIdx >= 0 ? todayIdx : 0;
-    const idx = Math.min(6, Math.max(0, base + offset));
+    const safeOffset = Number(offset) || 0;
+    const idx = Math.min(6, Math.max(0, base + safeOffset));
     return currentWeekDates[idx];
   };
 
-  const acceptSubtask = (key: string, title: string, dayOffset: number, priority: TaskPriority, mood?: TaskMood, timeBlock?: TimeBlock) => {
+  const acceptSubtask = (
+    key: string,
+    title: string,
+    dayOffset: number,
+    priority: TaskPriority,
+    mood?: TaskMood,
+    timeBlock?: TimeBlock,
+  ) => {
     const date = dateForOffset(dayOffset);
     if (!date) return;
-    addTask(date, title, priority, mood, timeBlock, null);
-    setAccepted(prev => new Set(prev).add(key));
+    addTask(
+      date,
+      title || "New Task",
+      priority || "medium",
+      mood,
+      timeBlock,
+      null,
+    );
+    setAccepted((prev) => new Set(prev).add(key));
   };
 
   const acceptAllBreakdown = () => {
-    if (!breakdown) return;
+    if (!breakdown || !Array.isArray(breakdown.subtasks)) return;
     breakdown.subtasks.forEach((s, i) => {
       const k = `b-${i}`;
       if (accepted.has(k)) return;
@@ -254,7 +509,7 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
   };
 
   const acceptAllSchedule = () => {
-    if (!schedule) return;
+    if (!schedule || !Array.isArray(schedule.assignments)) return;
     schedule.assignments.forEach((a, i) => {
       const k = `s-${i}`;
       if (accepted.has(k)) return;
@@ -262,14 +517,40 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
     });
   };
 
+  // Get current thinking steps
+  const currentSteps =
+    thinkingSteps[tab as keyof typeof thinkingSteps] || thinkingSteps.briefing;
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
+
+      {/* Notification Banner - Proactive AI */}
+      {notifications.length > 0 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/20 border border-primary/30 backdrop-blur-md shadow-lg max-w-md">
+            <span className="text-lg">💡</span>
+            <p className="text-xs font-body text-foreground flex-1">
+              {notifications[0].message}
+            </p>
+            <button
+              onClick={() => dismissNotification(notifications[0].id)}
+              className="text-foreground/40 hover:text-foreground text-sm"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       <div
         className="relative glass-panel bg-black/75 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl w-[92vw] max-w-xl max-h-[85vh] overflow-hidden flex flex-col animate-scale-in"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-3 border-b border-foreground/10">
@@ -277,74 +558,221 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
             <h2 className="font-display text-lg text-foreground flex items-center gap-2">
               <span className="text-xl">✦</span>
               <span>Chief of Staff</span>
-              <span className="text-[10px] font-body italic text-foreground/40">powered by Gemini</span>
+              <span className="text-[10px] font-body italic text-foreground/40">
+                powered by Gemini
+              </span>
             </h2>
-            <button onClick={onClose} className="text-foreground/50 hover:text-foreground text-sm">✕</button>
+            <button
+              onClick={onClose}
+              className="text-foreground/50 hover:text-foreground text-sm"
+            >
+              ✕
+            </button>
           </div>
-          <div className="flex gap-1">
-            {(['briefing', 'breakdown', 'schedule', 'report'] as Tab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-body capitalize transition-all ${
-                  tab === t ? 'bg-primary/25 text-foreground ring-1 ring-primary/40' : 'text-foreground/50 hover:text-foreground/80 hover:bg-white/5'
-                }`}
-              >
-                {t === 'briefing' ? '☀ Today' : t === 'breakdown' ? '⚡ Break down' : t === 'schedule' ? '🗓 Plan week' : '📊 Report'}
-              </button>
-            ))}
+          <div className="flex gap-1 flex-wrap">
+            {(["briefing", "breakdown", "schedule", "report", "chat"] as Tab[]).map(
+              (t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-body capitalize transition-all ${
+                    tab === t
+                      ? "bg-primary/25 text-foreground ring-1 ring-primary/40"
+                      : "text-foreground/50 hover:text-foreground/80 hover:bg-white/5"
+                  }`}
+                >
+                  {t === "briefing"
+                    ? "☀ Today"
+                    : t === "breakdown"
+                      ? "⚡ Break down"
+                      : t === "schedule"
+                        ? "🗓 Plan week"
+                        : t === "report"
+                          ? "📊 Report"
+                          : "💬 Chat"}
+                </button>
+              ),
+            )}
+            <button
+              onClick={() => {
+                onClose();
+                setTimeout(
+                  () => window.dispatchEvent(new Event("open-recovery")),
+                  100,
+                );
+              }}
+              className="px-3 py-1.5 rounded-full text-[11px] font-body text-green-400/70 hover:text-green-400 hover:bg-green-500/10 transition-all"
+            >
+              🌱 Recover
+            </button>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          {/* ENHANCED THINKING ANIMATION */}
           {loading && (
-            <div className="flex flex-col items-center justify-center py-10 space-y-4">
-              {/* Animated thinking dots */}
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="flex flex-col items-center justify-center py-8 space-y-4">
+              {/* Animated brain icon */}
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center animate-pulse">
+                  <span className="text-3xl">🧠</span>
+                </div>
+                {/* Pulsing rings */}
+                <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" />
               </div>
-              <p className="text-foreground/60 text-xs font-body animate-pulse">
-                {thinkingMessage || 'Analyzing...'}
+
+              {/* Steps with checkmarks */}
+              <div className="space-y-2 w-full max-w-xs">
+                {currentSteps.map((step, index) => {
+                  const isCompleted = completedSteps.has(step.id);
+                  const isCurrent = index === currentStepIndex && !isCompleted;
+                  const isPending = !isCompleted && !isCurrent;
+
+                  return (
+                    <div
+                      key={step.id}
+                      className={`flex items-center gap-3 text-xs font-body transition-all duration-300 ${
+                        isCompleted
+                          ? "text-green-400"
+                          : isCurrent
+                            ? "text-foreground"
+                            : "text-foreground/30"
+                      }`}
+                    >
+                      <span
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
+                          isCompleted
+                            ? "bg-green-500/20 text-green-400"
+                            : isCurrent
+                              ? "bg-primary/20 text-primary animate-pulse"
+                              : "bg-white/5 text-foreground/20"
+                        }`}
+                      >
+                        {isCompleted ? "✓" : isCurrent ? step.emoji : "○"}
+                      </span>
+                      <span className={isPending ? "opacity-30" : ""}>
+                        {step.text}
+                      </span>
+                      {isCurrent && (
+                        <span className="ml-auto text-primary animate-pulse">
+                          ...
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* BRIEFING - Enhanced with weather-like greeting */}
+          {tab === "briefing" && !loading && briefing && (
+            <div className="space-y-4 animate-fade-in">
+              {/* Weather-like greeting card */}
+              <div className="rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-green-500/10 border border-primary/20 p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-2xl mb-1">☀️</p>
+                    <p className="font-display text-xl text-foreground leading-tight">
+                      {getTimeBasedGreeting()}. Here's your mission for today.
+                    </p>
+                    <p className="text-xs font-body text-foreground/60 mt-2">
+                      {tasks.length} tasks tracked
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      onClick={() => {
+                        setBriefing(null);
+                        setBriefingDate(null);
+                      }}
+                      className="text-[10px] text-foreground/40 hover:text-foreground/70 transition-colors"
+                      title="Refresh briefing"
+                    >
+                      🔄
+                    </button>
+                    <div className="text-right">
+                      <p className="font-display text-3xl text-foreground">
+                        {Math.round(Number(briefing?.confidence) || 0)}%
+                      </p>
+                      <p className="text-[10px] font-body text-foreground/40">
+                        confidence
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-white/5 border border-foreground/10 p-3">
+                  <p className="text-[9px] font-body text-foreground/40 uppercase tracking-widest">
+                    Workload
+                  </p>
+                  <p className="font-display text-lg text-foreground mt-0.5">
+                    {(Number(briefing?.workloadHours) || 0).toFixed(1)}h
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/5 border border-foreground/10 p-3">
+                  <p className="text-[9px] font-body text-foreground/40 uppercase tracking-widest">
+                    Deep Work
+                  </p>
+                  <p className="font-display text-lg text-foreground mt-0.5">
+                    {briefing?.bestFocusWindow || "Flexible"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Top Risk */}
+              <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs">⚠️</span>
+                  <p className="text-[10px] font-body text-red-400/70 uppercase tracking-widest">
+                    Top Risk
+                  </p>
+                </div>
+                <p className="text-xs font-body text-foreground/90">
+                  {briefing?.topRisk || "None identified."}
+                </p>
+              </div>
+
+              {/* Recommendation */}
+              <div className="rounded-xl bg-primary/10 border border-primary/20 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs">💡</span>
+                  <p className="text-[10px] font-body text-primary/70 uppercase tracking-widest">
+                    Recommendation
+                  </p>
+                </div>
+                <p className="text-sm font-body text-foreground leading-relaxed">
+                  {briefing?.recommendation || "Proceed with your priorities."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {tab === "briefing" && !loading && !briefing && (
+            <div className="flex flex-col items-center justify-center py-10 space-y-4 animate-fade-in">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+                <span className="text-4xl">☀️</span>
+              </div>
+              <p className="text-foreground/80 text-sm font-body text-center">
+                Welcome back.
+              </p>
+              <p className="text-foreground/40 text-xs font-body text-center">
+                Click "Today" to receive your morning briefing.
               </p>
             </div>
           )}
 
-          {/* BRIEFING */}
-          {tab === 'briefing' && !loading && briefing && (
-            <div className="space-y-3 animate-fade-in">
-              <p className="font-display text-base text-foreground leading-snug">{briefing.greeting}</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Stat label="Workload" value={`${briefing.workloadHours.toFixed(1)}h`} />
-                <Stat label="Confidence" value={`${Math.round(briefing.confidence)}%`} />
-                <Stat label="Deep work" value={briefing.bestFocusWindow} />
-                <Stat label="Top risk" value={briefing.topRisk} small />
-              </div>
-              <div className="rounded-xl bg-primary/10 border border-primary/20 p-3">
-                <p className="text-[10px] font-body text-primary/70 uppercase tracking-widest mb-1">Recommendation</p>
-                <p className="text-xs font-body text-foreground/90 leading-relaxed">{briefing.recommendation}</p>
-              </div>
-            </div>
-          )}
-          {tab === 'briefing' && !loading && !briefing && (
-            <div className="flex flex-col items-center justify-center py-10 space-y-4 animate-fade-in">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-3xl">☀️</span>
-              </div>
-              <p className="text-foreground/60 text-xs font-body text-center">Welcome back. Let's start your day.</p>
-              <p className="text-foreground/40 text-[10px] font-body text-center">Click "Today" to receive your morning briefing.</p>
-            </div>
-          )}
-
           {/* BREAKDOWN */}
-          {tab === 'breakdown' && (
+          {tab === "breakdown" && (
             <div className="space-y-3">
               <div className="flex gap-2">
                 <input
                   value={goalInput}
-                  onChange={e => setGoalInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleBreakdown()}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleBreakdown()}
                   placeholder='e.g. "Build Lumira landing page"'
                   className="flex-1 bg-white/5 border border-foreground/15 rounded-lg px-3 py-2 text-xs font-body text-foreground placeholder:text-foreground/30 outline-none focus:border-primary/40"
                 />
@@ -359,36 +787,63 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
               {!loading && breakdown && (
                 <div className="space-y-2 animate-fade-in">
                   <div className="rounded-xl bg-white/5 border border-foreground/10 p-3">
-                    <p className="text-xs font-body text-foreground/90">{breakdown.summary}</p>
-                    <p className="text-[10px] font-body text-foreground/50 mt-1">≈ {breakdown.estimatedHours}h total</p>
+                    <p className="text-xs font-body text-foreground/90">
+                      {breakdown?.summary || "Goal Breakdown"}
+                    </p>
+                    <p className="text-[10px] font-body text-foreground/50 mt-1">
+                      ≈ {Number(breakdown?.estimatedHours) || 0}h total
+                    </p>
                   </div>
-                  {breakdown.subtasks.map((s, i) => {
+                  {(breakdown?.subtasks || []).map((s, i) => {
                     const k = `b-${i}`;
-                    const date = dateForOffset(s.dayOffset);
-                    const day = days.find(d => d.id === date);
+                    const date = dateForOffset(Number(s.dayOffset) || 0);
+                    const day = days.find((d) => d.id === date);
                     return (
-                      <div key={k} className={`flex items-start gap-3 p-3 rounded-xl border ${accepted.has(k) ? 'bg-primary/10 border-primary/20 opacity-60' : 'bg-white/5 border-foreground/10'}`}>
+                      <div
+                        key={k}
+                        className={`flex items-start gap-3 p-3 rounded-xl border ${accepted.has(k) ? "bg-primary/10 border-primary/20 opacity-60" : "bg-white/5 border-foreground/10"}`}
+                      >
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-body text-foreground">{s.title}</p>
+                          <p className="text-xs font-body text-foreground">
+                            {s.title || "Task"}
+                          </p>
                           <div className="flex items-center gap-2 mt-1.5 text-[10px] text-foreground/50">
-                            <span>{priEmoji[s.priority]}</span>
-                            {s.timeBlock && <span>{blockEmoji[s.timeBlock]}</span>}
-                            <span>{s.estimatedMinutes}m</span>
-                            <span>· {day?.short ?? `+${s.dayOffset}d`}</span>
+                            <span>{priEmoji[s.priority || "medium"]}</span>
+                            {s.timeBlock && (
+                              <span>{blockEmoji[s.timeBlock]}</span>
+                            )}
+                            <span>{Number(s.estimatedMinutes) || 0}m</span>
+                            <span>
+                              · {day?.short ?? `+${Number(s.dayOffset) || 0}d`}
+                            </span>
                           </div>
                         </div>
                         <button
-                          onClick={() => acceptSubtask(k, s.title, s.dayOffset, s.priority, s.mood, s.timeBlock)}
+                          onClick={() =>
+                            acceptSubtask(
+                              k,
+                              s.title,
+                              s.dayOffset,
+                              s.priority,
+                              s.mood,
+                              s.timeBlock,
+                            )
+                          }
                           disabled={accepted.has(k)}
-                          className={`px-3 py-1 rounded-lg text-[10px] font-body ${accepted.has(k) ? 'text-primary/60 bg-primary/5' : 'text-foreground/70 bg-white/10 hover:bg-primary/20 hover:text-foreground'}`}
+                          className={`px-3 py-1 rounded-lg text-[10px] font-body ${accepted.has(k) ? "text-primary/60 bg-primary/5" : "text-foreground/70 bg-white/10 hover:bg-primary/20 hover:text-foreground"}`}
                         >
-                          {accepted.has(k) ? '✓ Added' : 'Accept'}
+                          {accepted.has(k) ? "✓ Added" : "Accept"}
                         </button>
                       </div>
                     );
                   })}
-                  {breakdown.subtasks.some((_, i) => !accepted.has(`b-${i}`)) && (
-                    <button onClick={acceptAllBreakdown} className="w-full py-2 rounded-lg text-xs font-body bg-primary/15 text-foreground/80 hover:bg-primary/25 border border-primary/15 transition-all duration-200 hover:scale-[1.01]">
+                  {(breakdown?.subtasks || []).some(
+                    (_, i) => !accepted.has(`b-${i}`),
+                  ) && (
+                    <button
+                      onClick={acceptAllBreakdown}
+                      className="w-full py-2 rounded-lg text-xs font-body bg-primary/15 text-foreground/80 hover:bg-primary/25 border border-primary/15 transition-all duration-200 hover:scale-[1.01]"
+                    >
                       Accept all
                     </button>
                   )}
@@ -398,12 +853,14 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
           )}
 
           {/* SCHEDULE */}
-          {tab === 'schedule' && (
+          {tab === "schedule" && (
             <div className="space-y-3">
               <textarea
                 value={scheduleInput}
-                onChange={e => setScheduleInput(e.target.value)}
-                placeholder={'List the goals for the week, one per line.\nExam Friday\nWorkout\nAssignments\n…'}
+                onChange={(e) => setScheduleInput(e.target.value)}
+                placeholder={
+                  "List your goals for the week, one per line.\nExam Friday\nWorkout\nAssignments\n…"
+                }
                 rows={4}
                 className="w-full bg-white/5 border border-foreground/15 rounded-lg px-3 py-2 text-xs font-body text-foreground placeholder:text-foreground/30 outline-none focus:border-primary/40 resize-none"
               />
@@ -417,35 +874,63 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
               {!loading && schedule && (
                 <div className="space-y-2 animate-fade-in">
                   <div className="rounded-xl bg-primary/10 border border-primary/20 p-3">
-                    <p className="text-[10px] font-body text-primary/70 uppercase tracking-widest mb-1">Why this plan</p>
-                    <p className="text-xs font-body text-foreground/90 leading-relaxed">{schedule.rationale}</p>
+                    <p className="text-[10px] font-body text-primary/70 uppercase tracking-widest mb-1">
+                      Why this plan
+                    </p>
+                    <p className="text-xs font-body text-foreground/90 leading-relaxed">
+                      {schedule?.rationale ||
+                        "Balanced workflow distributed across the week."}
+                    </p>
                   </div>
-                  {schedule.assignments.map((a, i) => {
+                  {(schedule?.assignments || []).map((a, i) => {
                     const k = `s-${i}`;
-                    const date = dateForOffset(a.dayOffset);
-                    const day = days.find(d => d.id === date);
+                    const date = dateForOffset(Number(a.dayOffset) || 0);
+                    const day = days.find((d) => d.id === date);
                     return (
-                      <div key={k} className={`flex items-start gap-3 p-3 rounded-xl border ${accepted.has(k) ? 'bg-primary/10 border-primary/20 opacity-60' : 'bg-white/5 border-foreground/10'}`}>
+                      <div
+                        key={k}
+                        className={`flex items-start gap-3 p-3 rounded-xl border ${accepted.has(k) ? "bg-primary/10 border-primary/20 opacity-60" : "bg-white/5 border-foreground/10"}`}
+                      >
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-body text-foreground">{a.title}</p>
+                          <p className="text-xs font-body text-foreground">
+                            {a.title || "Task"}
+                          </p>
                           <div className="flex items-center gap-2 mt-1.5 text-[10px] text-foreground/50">
-                            <span>{priEmoji[a.priority]}</span>
-                            {a.timeBlock && <span>{blockEmoji[a.timeBlock]}</span>}
-                            <span>· {day?.name ?? `+${a.dayOffset}d`}</span>
+                            <span>{priEmoji[a.priority || "medium"]}</span>
+                            {a.timeBlock && (
+                              <span>{blockEmoji[a.timeBlock]}</span>
+                            )}
+                            <span>
+                              · {day?.name ?? `+${Number(a.dayOffset) || 0}d`}
+                            </span>
                           </div>
                         </div>
                         <button
-                          onClick={() => acceptSubtask(k, a.title, a.dayOffset, a.priority, a.mood, a.timeBlock)}
+                          onClick={() =>
+                            acceptSubtask(
+                              k,
+                              a.title,
+                              a.dayOffset,
+                              a.priority,
+                              a.mood,
+                              a.timeBlock,
+                            )
+                          }
                           disabled={accepted.has(k)}
-                          className={`px-3 py-1 rounded-lg text-[10px] font-body ${accepted.has(k) ? 'text-primary/60 bg-primary/5' : 'text-foreground/70 bg-white/10 hover:bg-primary/20 hover:text-foreground'}`}
+                          className={`px-3 py-1 rounded-lg text-[10px] font-body ${accepted.has(k) ? "text-primary/60 bg-primary/5" : "text-foreground/70 bg-white/10 hover:bg-primary/20 hover:text-foreground"}`}
                         >
-                          {accepted.has(k) ? '✓' : 'Add'}
+                          {accepted.has(k) ? "✓" : "Add"}
                         </button>
                       </div>
                     );
                   })}
-                  {schedule.assignments.some((_, i) => !accepted.has(`s-${i}`)) && (
-                    <button onClick={acceptAllSchedule} className="w-full py-2 rounded-lg text-xs font-body bg-primary/15 text-foreground/80 hover:bg-primary/25 border border-primary/15 transition-all duration-200 hover:scale-[1.01]">
+                  {(schedule?.assignments || []).some(
+                    (_, i) => !accepted.has(`s-${i}`),
+                  ) && (
+                    <button
+                      onClick={acceptAllSchedule}
+                      className="w-full py-2 rounded-lg text-xs font-body bg-primary/15 text-foreground/80 hover:bg-primary/25 border border-primary/15 transition-all duration-200 hover:scale-[1.01]"
+                    >
                       Apply entire plan
                     </button>
                   )}
@@ -455,36 +940,126 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
           )}
 
           {/* MISSION REPORT */}
-          {tab === 'report' && missionReport && (
+          {tab === "report" && missionReport && (
             <div className="space-y-3 animate-fade-in">
               <div className="rounded-xl bg-gradient-to-br from-primary/20 to-green-500/10 border border-primary/20 p-4">
-                <h3 className="text-xs font-body text-primary/70 uppercase tracking-widest mb-3">Mission Report</h3>
+                <h3 className="text-xs font-body text-primary/70 uppercase tracking-widest mb-3">
+                  Mission Report
+                </h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <Stat label="Completion" value={`${Math.round(missionReport.completionProbability)}%`} />
-                  <Stat label="Deep Work" value={`${missionReport.deepWorkHours}h`} />
-                  <Stat label="Recovery" value={`${missionReport.recoveryTime}h`} />
-                  <Stat label="High Risk" value={String(missionReport.highRiskTasks)} small />
+                  <Stat
+                    label="Completion"
+                    value={`${Math.round(Number(missionReport?.completionProbability) || 0)}%`}
+                  />
+                  <Stat
+                    label="Deep Work"
+                    value={`${(Number(missionReport?.deepWorkHours) || 0).toFixed(1)}h`}
+                  />
+                  <Stat
+                    label="Recovery"
+                    value={`${(Number(missionReport?.recoveryTime) || 0).toFixed(1)}h`}
+                  />
+                  <Stat
+                    label="High Risk"
+                    value={String(Number(missionReport?.highRiskTasks) || 0)}
+                    small
+                  />
                 </div>
               </div>
               <div className="rounded-xl bg-white/5 border border-foreground/10 p-3">
-                <p className="text-[10px] font-body text-foreground/40 uppercase tracking-widest mb-2">Strategy</p>
-                <p className="text-xs font-body text-foreground/80 leading-relaxed">{missionReport.schedulingStrategy}</p>
+                <p className="text-[10px] font-body text-foreground/40 uppercase tracking-widest mb-2">
+                  Strategy
+                </p>
+                <p className="text-xs font-body text-foreground/80 leading-relaxed">
+                  {missionReport?.schedulingStrategy || "Standard tracking."}
+                </p>
               </div>
-              {missionReport.protectedFocusBlocks > 0 && (
+              {Number(missionReport?.protectedFocusBlocks) > 0 && (
                 <div className="flex items-center gap-2 text-xs text-green-400">
                   <span>✓</span>
-                  <span>{missionReport.protectedFocusBlocks} focus blocks protected</span>
+                  <span>
+                    {missionReport.protectedFocusBlocks} focus blocks protected
+                  </span>
                 </div>
               )}
             </div>
           )}
-          {tab === 'report' && !missionReport && (
+
+          {tab === "report" && !missionReport && (
             <div className="flex flex-col items-center justify-center py-10 space-y-4 animate-fade-in">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <span className="text-3xl">📊</span>
               </div>
-              <p className="text-foreground/60 text-xs font-body text-center">Your mission report will appear here.</p>
-              <p className="text-foreground/40 text-[10px] font-body text-center">Plan your week to see the strategy breakdown.</p>
+              <p className="text-foreground/60 text-xs font-body text-center">
+                Your mission report will appear here.
+              </p>
+              <p className="text-foreground/40 text-[10px] font-body text-center">
+                Plan your week to see the strategy breakdown.
+              </p>
+            </div>
+          )}
+
+          {/* CHAT TAB */}
+          {tab === "chat" && (
+            <div className="space-y-3 animate-fade-in h-[300px] flex flex-col">
+              <div className="flex-1 overflow-y-auto space-y-2 min-h-[200px]">
+                {chatMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
+                    <span className="text-3xl">💬</span>
+                    <p className="text-xs font-body text-foreground/60">
+                      Chat with your AI Chief
+                    </p>
+                    <p className="text-[10px] font-body text-foreground/40">
+                      Ask questions, get advice, or discuss your tasks
+                    </p>
+                  </div>
+                ) : (
+                  chatMessages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`p-2 rounded-lg text-xs font-body ${
+                        msg.role === "user"
+                          ? "bg-primary/10 border border-primary/20 ml-4"
+                          : "bg-white/5 border border-foreground/10 mr-4"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && chatInput.trim()) {
+                      // Add user message
+                      const userMsg = chatInput.trim();
+                      setChatMessages(prev => [...prev, { role: "user", content: userMsg }]);
+                      setChatInput("");
+
+                      // Generate AI response (using invoke for a simple chat)
+                      (async () => {
+                        setLoading(true);
+                        const data = await invoke("chat", {
+                          message: userMsg,
+                          tasks: tasks.slice(0, 10).map(t => ({ title: t.title, completed: t.completed, date: t.date })),
+                          todayDate: todayDayId,
+                        });
+                        if (data?.response) {
+                          setChatMessages(prev => [...prev, { role: "ai", content: data.response }]);
+                        } else {
+                          setChatMessages(prev => [...prev, { role: "ai", content: "I understand. Tell me more about what you'd like to accomplish." }]);
+                        }
+                        setLoading(false);
+                      })();
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-white/5 border border-foreground/15 rounded-lg px-3 py-2 text-xs font-body text-foreground placeholder:text-foreground/30 outline-none focus:border-primary/40"
+                />
+              </div>
             </div>
           )}
 
@@ -497,7 +1072,10 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
                   if (lastSnapshot) {
                     restoreSnapshot(lastSnapshot.id);
                     setLastAction(null);
-                    toast({ title: 'Undone', description: lastSnapshot.description });
+                    toast({
+                      title: "Undone",
+                      description: lastSnapshot.description,
+                    });
                   }
                 }}
                 className="w-full py-2 rounded-lg text-xs font-body bg-destructive/10 text-destructive/80 hover:bg-destructive/20 border border-destructive/20"
@@ -512,11 +1090,25 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
   );
 }
 
-function Stat({ label, value, small }: { label: string; value: string; small?: boolean }) {
+function Stat({
+  label,
+  value,
+  small,
+}: {
+  label: string;
+  value: string;
+  small?: boolean;
+}) {
   return (
     <div className="rounded-xl bg-white/5 border border-foreground/10 p-3">
-      <p className="text-[9px] font-body text-foreground/40 uppercase tracking-widest">{label}</p>
-      <p className={`font-display text-foreground mt-0.5 ${small ? 'text-xs leading-snug' : 'text-base'}`}>{value}</p>
+      <p className="text-[9px] font-body text-foreground/40 uppercase tracking-widest">
+        {label}
+      </p>
+      <p
+        className={`font-display text-foreground mt-0.5 ${small ? "text-xs leading-snug" : "text-base"}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }

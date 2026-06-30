@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { usePlanner } from '@/context/PlannerContext';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 interface WeeklyAnalyticsProps {
   onClose: () => void;
@@ -20,8 +20,21 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: 'hsl(140, 40%, 50%)',
 };
 
+// Load AI memory for insights
+const loadAIMemory = () => {
+  try {
+    const stored = localStorage.getItem('planner-ai-memory');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
 export function WeeklyAnalytics({ onClose }: WeeklyAnalyticsProps) {
-  const { days, tasks, currentWeekDates, focusSessions } = usePlanner();
+  const { days, tasks, currentWeekDates, focusSessions, mode } = usePlanner();
+
+  // Get AI memory
+  const aiMemory = useMemo(() => loadAIMemory(), []);
 
   const completionData = useMemo(() => {
     return days.map(day => {
@@ -35,6 +48,22 @@ export function WeeklyAnalytics({ onClose }: WeeklyAnalyticsProps) {
       };
     });
   }, [days]);
+
+  // Energy pattern - completion rate by time block
+  const energyPattern = useMemo(() => {
+    const blocks = { morning: { done: 0, total: 0 }, afternoon: { done: 0, total: 0 }, evening: { done: 0, total: 0 } };
+    tasks.filter(t => currentWeekDates.includes(t.date)).forEach(t => {
+      if (t.timeBlock) {
+        blocks[t.timeBlock].total++;
+        if (t.completed) blocks[t.timeBlock].done++;
+      }
+    });
+    return [
+      { name: '🌅 Morning', completed: blocks.morning.done, rate: blocks.morning.total > 0 ? Math.round((blocks.morning.done / blocks.morning.total) * 100) : 0 },
+      { name: '☀️ Afternoon', completed: blocks.afternoon.done, rate: blocks.afternoon.total > 0 ? Math.round((blocks.afternoon.done / blocks.afternoon.total) * 100) : 0 },
+      { name: '🌙 Evening', completed: blocks.evening.done, rate: blocks.evening.total > 0 ? Math.round((blocks.evening.done / blocks.evening.total) * 100) : 0 },
+    ];
+  }, [tasks, currentWeekDates]);
 
   const moodData = useMemo(() => {
     const weekTasks = tasks.filter(t => currentWeekDates.includes(t.date));
@@ -85,18 +114,123 @@ export function WeeklyAnalytics({ onClose }: WeeklyAnalyticsProps) {
     return { count: weekSessions.length, minutes: totalMinutes, avgSwitches };
   }, [focusSessions, currentWeekDates]);
 
+  // Focus Streak - consecutive days with focus sessions
+  const focusStreak = useMemo(() => {
+    let streak = 0;
+    const sortedSessions = [...focusSessions].sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+    if (sortedSessions.length === 0) return 0;
+
+    let lastDate = sortedSessions[0].completedAt.split('T')[0];
+    for (const session of sortedSessions) {
+      const sessionDate = session.completedAt.split('T')[0];
+      const diff = new Date(lastDate).getTime() - new Date(sessionDate).getTime();
+      const daysDiff = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+      if (daysDiff <= 1) {
+        streak++;
+        lastDate = sessionDate;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }, [focusSessions]);
+
+  // Garden Health - based on completion and mode
+  const gardenHealth = useMemo(() => {
+    const totalTasks = tasks.filter(t => currentWeekDates.includes(t.date)).length;
+    const completed = tasks.filter(t => currentWeekDates.includes(t.date) && t.completed).length;
+    const rate = totalTasks > 0 ? completed / totalTasks : 0;
+
+    // Base score from completion
+    let health = rate * 100;
+
+    // Bonus for focus sessions
+    if (focusStats.count >= 5) health += 10;
+    if (focusStats.count >= 10) health += 10;
+
+    // Bonus for streak
+    if (aiMemory?.streakDays >= 3) health += 10;
+    if (aiMemory?.streakDays >= 7) health += 15;
+
+    // Penalty for missed tasks
+    const overdue = tasks.filter(t => !t.completed && t.date < currentWeekDates[0]).length;
+    health -= overdue * 5;
+
+    return Math.max(0, Math.min(100, Math.round(health)));
+  }, [tasks, currentWeekDates, focusStats.count, aiMemory]);
+
+  // Goal completion stats
   const totalTasks = tasks.filter(t => currentWeekDates.includes(t.date)).length;
   const completedTasks = tasks.filter(t => currentWeekDates.includes(t.date) && t.completed).length;
   const overallRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+  // Get AI insights
+  const insights = aiMemory?.insights || [];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-4xl glass-panel rounded-2xl p-8 max-h-[85vh] overflow-y-auto scrollbar-thin shadow-2xl">
+      <div className="relative z-10 w-full max-w-5xl glass-panel rounded-2xl p-8 max-h-[85vh] overflow-y-auto scrollbar-thin shadow-2xl">
         <div className="flex items-center justify-between mb-6 border-b border-foreground/10 pb-4">
-          <h2 className="font-display text-2xl text-foreground/95 text-nature drop-shadow-md">Weekly Insights</h2>
+          <div>
+            <h2 className="font-display text-2xl text-foreground/95 text-nature drop-shadow-md">Weekly Insights</h2>
+            <p className="text-xs font-body text-foreground/50 mt-1">Your productivity at a glance</p>
+          </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-black/20 text-foreground/60 hover:text-foreground hover:bg-black/40 transition-colors text-xl border border-white/5">×</button>
         </div>
+
+        {/* Phase 6: Meaningful Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+          {/* Focus Streak */}
+          <div className="bg-gradient-to-br from-orange-500/20 to-red-500/10 border border-orange-500/30 rounded-xl p-4 text-center">
+            <p className="text-2xl font-display text-orange-400">🔥</p>
+            <p className="font-display text-xl text-foreground mt-1">{focusStreak}</p>
+            <p className="text-[9px] font-body text-foreground/50 mt-0.5">Focus Streak</p>
+          </div>
+
+          {/* Deep Work Hours */}
+          <div className="bg-gradient-to-br from-primary/20 to-purple-500/10 border border-primary/30 rounded-xl p-4 text-center">
+            <p className="text-2xl font-display text-primary">⏱</p>
+            <p className="font-display text-xl text-foreground mt-1">{focusStats.minutes}m</p>
+            <p className="text-[9px] font-body text-foreground/50 mt-0.5">Deep Work</p>
+          </div>
+
+          {/* Garden Health */}
+          <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/10 border border-green-500/30 rounded-xl p-4 text-center">
+            <p className="text-2xl font-display text-green-400">{gardenHealth >= 80 ? '🌸' : gardenHealth >= 50 ? '🌿' : '🍂'}</p>
+            <p className="font-display text-xl text-foreground mt-1">{gardenHealth}%</p>
+            <p className="text-[9px] font-body text-foreground/50 mt-0.5">Garden Health</p>
+          </div>
+
+          {/* Energy Pattern */}
+          <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/10 border border-yellow-500/30 rounded-xl p-4 text-center">
+            <p className="text-2xl font-display text-yellow-400">⚡</p>
+            <p className="font-display text-xl text-foreground mt-1">
+              {energyPattern.sort((a, b) => b.rate - a.rate)[0]?.name.split(' ')[1] || 'N/A'}
+            </p>
+            <p className="text-[9px] font-body text-foreground/50 mt-0.5">Peak Energy</p>
+          </div>
+
+          {/* Goal Completion */}
+          <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border border-blue-500/30 rounded-xl p-4 text-center">
+            <p className="text-2xl font-display text-blue-400">🎯</p>
+            <p className="font-display text-xl text-foreground mt-1">{overallRate}%</p>
+            <p className="text-[9px] font-body text-foreground/50 mt-0.5">Goals Done</p>
+          </div>
+        </div>
+
+        {/* AI Insights */}
+        {insights.length > 0 && (
+          <div className="mb-6 p-4 rounded-xl bg-primary/10 border border-primary/20">
+            <p className="text-[10px] font-body text-primary/70 uppercase tracking-widest mb-2">💡 AI Insights</p>
+            <div className="space-y-1">
+              {insights.slice(0, 3).map((insight: string, i: number) => (
+                <p key={i} className="text-xs font-body text-foreground/80">{insight}</p>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -113,8 +247,8 @@ export function WeeklyAnalytics({ onClose }: WeeklyAnalyticsProps) {
             <p className="text-[10px] font-body text-foreground/50 mt-1">Focus Sessions</p>
           </div>
           <div className="bg-black/15 border border-white/5 rounded-xl p-4 text-center shadow-inner">
-            <p className="text-2xl font-display text-foreground/90">{focusStats.minutes}m</p>
-            <p className="text-[10px] font-body text-foreground/50 mt-1">Focus Time</p>
+            <p className="text-2xl font-display text-foreground/90">{aiMemory?.streakDays || 0}</p>
+            <p className="text-[10px] font-body text-foreground/50 mt-1">Day Streak</p>
           </div>
         </div>
 
@@ -133,6 +267,22 @@ export function WeeklyAnalytics({ onClose }: WeeklyAnalyticsProps) {
                 />
                 <Bar dataKey="done" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.85} />
                 <Bar dataKey="total" fill="hsla(0, 0%, 100%, 0.1)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Energy Pattern - NEW */}
+          <div className="bg-black/10 border border-white/5 rounded-xl p-5 shadow-inner">
+            <h3 className="font-body text-xs text-foreground/50 mb-4 uppercase tracking-widest">Energy Pattern</h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={energyPattern}>
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'hsla(42, 30%, 92%, 0.5)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'hsla(42, 30%, 92%, 0.3)' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: 'hsla(38, 20%, 15%, 0.95)', border: '1px solid hsla(0,0%,100%,0.1)', borderRadius: 8, fontSize: 11 }}
+                  labelStyle={{ color: 'hsla(42, 30%, 92%, 0.8)' }}
+                />
+                <Bar dataKey="rate" fill="hsl(45, 80%, 55%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -182,25 +332,6 @@ export function WeeklyAnalytics({ onClose }: WeeklyAnalyticsProps) {
                     />
                   </div>
                   <span className="text-[10px] font-body text-foreground/40 w-6 text-right">{p.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Time block usage */}
-          <div className="bg-black/10 border border-white/5 rounded-xl p-5 shadow-inner">
-            <h3 className="font-body text-xs text-foreground/50 mb-4 uppercase tracking-widest">Time Block Usage</h3>
-            <div className="space-y-3">
-              {timeBlockData.map(tb => (
-                <div key={tb.name} className="flex items-center gap-3">
-                  <span className="text-[11px] w-24 font-body text-foreground/60">{tb.name}</span>
-                  <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary/60 transition-all duration-700"
-                      style={{ width: `${totalTasks > 0 ? (tb.value / totalTasks) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] font-body text-foreground/40 w-6 text-right">{tb.value}</span>
                 </div>
               ))}
             </div>

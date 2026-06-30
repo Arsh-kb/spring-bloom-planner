@@ -242,6 +242,8 @@ interface PlannerContextType {
     dateStr: string,
     mood?: "calm" | "focused" | "energized" | "reflective",
   ) => void;
+  deleteJournalEntry: (entryId: string) => void;
+  updateJournalEntry: (entryId: string, content: string) => void;
   restoreData: (importedTasks: Task[], importedJournal: JournalEntry[]) => void;
 
   weekOffset: number;
@@ -361,7 +363,13 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const [pomodoroMinutes, setPomodoroMinutes] = useState(defaultPomodoro);
   const [pomodoroSeconds, setPomodoroSeconds] = useState(0);
   const [pomodoroActive, setPomodoroActive] = useState(false);
-  const [zenMode, setZenMode] = useState(false);
+  const [zenMode, setZenMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('springscape-zen-mode');
+      return saved === 'true';
+    }
+    return false;
+  });
   const [weekOffset, setWeekOffset] = useState(0);
 
   // Deep Focus state
@@ -613,6 +621,22 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     [setJournal],
   );
 
+  const deleteJournalEntry = useCallback(
+    (entryId: string) => {
+      setJournal((prev) => prev.filter((j) => j.id !== entryId));
+    },
+    [setJournal],
+  );
+
+  const updateJournalEntry = useCallback(
+    (entryId: string, content: string) => {
+      setJournal((prev) =>
+        prev.map((j) => (j.id === entryId ? { ...j, content } : j))
+      );
+    },
+    [setJournal],
+  );
+
   const restoreData = useCallback(
     (importedTasks: Task[], importedJournal: JournalEntry[]) => {
       setTasks(importedTasks);
@@ -626,7 +650,13 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     setPomodoroMinutes(defaultPomodoro);
     setPomodoroSeconds(0);
   }, [defaultPomodoro]);
-  const toggleZenMode = useCallback(() => setZenMode((z) => !z), []);
+  const toggleZenMode = useCallback(() => {
+    setZenMode((z) => {
+      const newValue = !z;
+      localStorage.setItem('springscape-zen-mode', String(newValue));
+      return newValue;
+    });
+  }, []);
 
   // Deep Focus
   const enterDeepFocus = useCallback((taskId?: string) => {
@@ -909,6 +939,8 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
         moveTask,
         reorderTasks,
         addJournalEntry,
+        deleteJournalEntry,
+        updateJournalEntry,
         restoreData,
         weekOffset,
         setWeekOffset,

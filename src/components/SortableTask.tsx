@@ -149,7 +149,7 @@ export function SortableTask({ task }: SortableTaskProps) {
         </button>
 
         <div
-          className="flex-1"
+          className="flex-1 min-w-0"
           onPointerDown={(e) => isEditing && e.stopPropagation()}
         >
           {isEditing ? (
@@ -163,10 +163,10 @@ export function SortableTask({ task }: SortableTaskProps) {
             />
           ) : (
             <span
-              className={`text-sm font-body leading-tight transition-all duration-500 block cursor-pointer ${
+              className={`text-sm font-body leading-tight transition-all duration-500 block cursor-pointer break-words ${
                 task.completed ? 'text-foreground/40 line-through' : 'text-foreground'
               }`}
-              style={{ textShadow: task.completed ? 'none' : '0 1px 3px rgba(0,0,0,0.7)' }}
+              style={{ textShadow: task.completed ? 'none' : '0 1px 3px rgba(0,0,0,0.7)', wordBreak: 'break-word' }}
               onDoubleClick={() => setIsEditing(true)}
               onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
               onPointerDown={(e) => e.stopPropagation()}
@@ -222,6 +222,70 @@ export function SortableTask({ task }: SortableTaskProps) {
           className="ml-6 mr-1 mb-2 mt-1 bg-black/25 border border-foreground/8 rounded-lg p-3 space-y-3"
           onPointerDown={(e) => e.stopPropagation()}
         >
+          {/* Priority and Time Block Row */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-[9px] font-body text-foreground/50 uppercase tracking-wider">Priority</label>
+              <div className="flex gap-1">
+                {(['low', 'medium', 'high'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => updateTaskDetails(task.id, { priority: p })}
+                    className={`text-[10px] px-2 py-0.5 rounded transition-all ${
+                      task.priority === p ? 'bg-primary/30 text-foreground' : 'bg-black/20 text-foreground/50 hover:bg-black/30'
+                    }`}
+                    title={p.charAt(0).toUpperCase() + p.slice(1)}
+                  >
+                    {p === 'high' ? '🍒' : p === 'medium' ? '🌿' : '🍂'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-[9px] font-body text-foreground/50 uppercase tracking-wider">Time</label>
+              <div className="flex gap-1">
+                {(['morning', 'afternoon', 'evening'] as const).map((tb) => (
+                  <button
+                    key={tb}
+                    onClick={() => updateTaskDetails(task.id, { timeBlock: tb })}
+                    className={`text-[10px] px-2 py-0.5 rounded transition-all ${
+                      task.timeBlock === tb ? 'bg-primary/30 text-foreground' : 'bg-black/20 text-foreground/50 hover:bg-black/30'
+                    }`}
+                    title={tb.charAt(0).toUpperCase() + tb.slice(1)}
+                  >
+                    {tb === 'morning' ? '🌅' : tb === 'afternoon' ? '☀️' : '🌙'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={() => updateTaskDetails(task.id, { timeBlock: undefined })}
+              className="text-[9px] text-foreground/30 hover:text-destructive transition-colors"
+              title="Clear time block"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Mood display */}
+          <div className="flex items-center gap-2">
+            <label className="text-[9px] font-body text-foreground/50 uppercase tracking-wider">Mood</label>
+            <div className="flex gap-1">
+              {(['routine', 'reflective', 'high-strain', 'energizing'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => updateTaskDetails(task.id, { mood: m })}
+                  className={`text-[9px] px-2 py-0.5 rounded transition-all ${
+                    task.mood === m ? 'bg-primary/30 text-foreground' : 'bg-black/20 text-foreground/50 hover:bg-black/30'
+                  }`}
+                  title={m}
+                >
+                  <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: moodColors[m] }} />
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="text-[9px] font-body text-foreground/50 uppercase tracking-wider block mb-1 drop-shadow-sm">Description</label>
             <textarea

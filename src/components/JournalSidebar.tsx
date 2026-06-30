@@ -4,7 +4,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import woodTexture from '@/assets/wood-texture.jpg';
 
 export function JournalSidebar() {
-  const { journal, addJournalEntry, days, todayDayId, journalOpen: isOpen, setJournalOpen: setIsOpen } = usePlanner();
+  const { journal, addJournalEntry, deleteJournalEntry, updateJournalEntry, days, todayDayId, journalOpen: isOpen, setJournalOpen: setIsOpen } = usePlanner();
   const [entry, setEntry] = useState('');
   const [expandedDay, setExpandedDay] = useState<string | null>(todayDayId);
   const isMobile = useIsMobile();
@@ -77,6 +77,8 @@ export function JournalSidebar() {
                 entry={entry}
                 setEntry={setEntry}
                 handleSubmit={handleSubmit}
+                deleteJournalEntry={deleteJournalEntry}
+                updateJournalEntry={updateJournalEntry}
               />
             </div>
           </div>
@@ -109,20 +111,40 @@ export function JournalSidebar() {
           entry={entry}
           setEntry={setEntry}
           handleSubmit={handleSubmit}
+          deleteJournalEntry={deleteJournalEntry}
+          updateJournalEntry={updateJournalEntry}
         />
       </div>
     </div>
   );
 }
 
-function JournalContent({ journalByDay, expandedDay, setExpandedDay, entry, setEntry, handleSubmit }: {
+function JournalContent({ journalByDay, expandedDay, setExpandedDay, entry, setEntry, handleSubmit, deleteJournalEntry, updateJournalEntry }: {
   journalByDay: { day: any; entries: any[] }[];
   expandedDay: string | null;
   setExpandedDay: (id: string | null) => void;
   entry: string;
   setEntry: (v: string) => void;
   handleSubmit: () => void;
+  deleteJournalEntry: (id: string) => void;
+  updateJournalEntry: (id: string, content: string) => void;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+
+  const handleStartEdit = (j: any) => {
+    setEditingId(j.id);
+    setEditContent(j.content);
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (editContent.trim()) {
+      updateJournalEntry(id, editContent.trim());
+    }
+    setEditingId(null);
+    setEditContent('');
+  };
+
   return (
       <div className="flex-1 flex flex-col overflow-hidden px-4 sm:px-0 pb-16 sm:pb-0">
       <div className="flex-1 overflow-y-auto space-y-1 mb-4 scrollbar-thin">
@@ -157,19 +179,63 @@ function JournalContent({ journalByDay, expandedDay, setExpandedDay, entry, setE
 
               <div
                 className="overflow-hidden transition-all duration-500 ease-out"
-                style={{ maxHeight: isExpanded ? `${entries.length * 100}px` : '0px', opacity: isExpanded ? 1 : 0 }}
+                style={{ maxHeight: isExpanded ? `${entries.length * 120}px` : '0px', opacity: isExpanded ? 1 : 0 }}
               >
                 <div className="py-1.5 px-1 space-y-1.5">
                   {entries.map(j => (
                     <div
                       key={j.id}
-                      className="rounded-md px-3 py-2 bg-black/25 border border-foreground/8"
+                      className="rounded-md px-3 py-2 bg-black/25 border border-foreground/8 group/entry"
                       style={{ boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' }}
                     >
-                      <p className="text-xs font-body text-foreground leading-relaxed drop-shadow-md">{j.content}</p>
-                      <span className="text-[10px] text-foreground/50 mt-1 block font-body">
-                        {new Date(j.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                      </span>
+                      {editingId === j.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            className="w-full bg-black/20 border border-foreground/10 rounded px-2 py-1 text-xs font-body text-foreground/90 outline-none focus:border-primary/30 resize-none"
+                            rows={2}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleSaveEdit(j.id)}
+                              className="text-[10px] text-primary hover:text-primary/80 transition-colors"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="text-[10px] text-foreground/50 hover:text-foreground transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs font-body text-foreground leading-relaxed drop-shadow-md">{j.content}</p>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[10px] text-foreground/50 font-body">
+                              {new Date(j.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                            <div className="flex gap-2 opacity-0 group-hover/entry:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => handleStartEdit(j)}
+                                className="text-[10px] text-foreground/50 hover:text-primary transition-colors"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => deleteJournalEntry(j.id)}
+                                className="text-[10px] text-foreground/50 hover:text-destructive transition-colors"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -301,9 +301,7 @@ export function PlannerHeader() {
               </Tooltip>
             </TooltipProvider>
           )}
-          <a href="/gate" className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm" title="Focus Gate (App Lock)">
-            🔒
-          </a>
+          {/* Focus Gate button removed - keeping file for future fix */}
 
           <div ref={toolsMenuRef} className="relative">
             <button onClick={() => { setShowToolsMenu(!showToolsMenu); setShowModeMenu(false); }} className="glass-panel px-3 py-1.5 rounded-full text-xs font-body transition-all duration-300 text-foreground/70 hover:text-foreground hover:bg-white/5 shadow-sm">

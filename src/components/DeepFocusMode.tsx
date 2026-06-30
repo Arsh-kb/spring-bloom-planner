@@ -62,14 +62,20 @@ export function DeepFocusMode() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [deepFocusActive]);
 
-  // Detect timer completion
+  // Detect timer completion - only fire once when session ends naturally
+  const notificationFired = useRef(false);
   useEffect(() => {
-    if (deepFocusActive && !pomodoroActive && elapsedSeconds > 5) {
+    if (deepFocusActive && !pomodoroActive && elapsedSeconds > 5 && !notificationFired.current) {
+      notificationFired.current = true;
       setSessionComplete(true);
-      // Browser notification
+      // Browser notification - only once
       if (Notification.permission === 'granted') {
         new Notification('🌿 Deep Focus Complete', { body: focusTask?.title || 'Session ended' });
       }
+    }
+    // Reset when starting a new session
+    if (deepFocusActive && pomodoroActive) {
+      notificationFired.current = false;
     }
   }, [pomodoroActive, deepFocusActive, elapsedSeconds, focusTask]);
 
