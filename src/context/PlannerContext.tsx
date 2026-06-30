@@ -974,6 +974,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
 
         // AI Executive Assistant
         confidence,
+        setConfidence,
         computeConfidence,
         taskRisks,
         computeTaskRisk,
