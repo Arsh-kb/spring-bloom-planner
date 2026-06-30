@@ -296,6 +296,7 @@ interface PlannerContextType {
 
   // Confidence Engine
   confidence: ConfidenceScore | null;
+  setConfidence: React.Dispatch<React.SetStateAction<ConfidenceScore | null>>;
   computeConfidence: () => Promise<void>;
 
   // Task Risk
@@ -973,6 +974,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
 
         // AI Executive Assistant
         confidence,
+        setConfidence,
         computeConfidence,
         taskRisks,
         computeTaskRisk,

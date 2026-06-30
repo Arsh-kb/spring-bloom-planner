@@ -122,7 +122,7 @@ export function useAIMemory() {
       // Find most productive day
       const dayCompletions: { [key: string]: number } = {};
       Object.entries(memory.completionPatterns).forEach(([date, data]) => {
-        const day = new Date(date).toLocaleDateString('en-US', { weekday: 'lowercase' });
+        const day = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         dayCompletions[day] = (dayCompletions[day] || 0) + (data.completed / data.total);
       });
       const bestDay = Object.entries(dayCompletions).sort((a, b) => b[1] - a[1])[0];

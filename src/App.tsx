@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import FocusGate from "./pages/FocusGate";
 import { FocusGateProvider } from "./context/FocusGateContext";
+import { PlannerProvider } from "./context/PlannerContext";
 
 const queryClient = new QueryClient();
 
@@ -16,14 +17,16 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <FocusGateProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/gate" element={<FocusGate />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </FocusGateProvider>
+        <PlannerProvider>
+          <FocusGateProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/gate" element={<FocusGate />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </FocusGateProvider>
+        </PlannerProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
