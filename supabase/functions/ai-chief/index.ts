@@ -17,8 +17,15 @@ const corsHeaders = {
 };
 
 // ---------- Config ----------
-const DEFAULT_MODEL = "qwen/qwen3-8b:free";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+
+const MODEL_CHAIN = [
+  Deno.env.get("OPENROUTER_MODEL") || "openai/gpt-oss-120b:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+  "openai/gpt-oss-20b:free",
+  "nvidia/nemotron-nano-9b-v2:free",
+];
 
 enum BackendSource {
   OPENROUTER = "openrouter",
@@ -166,47 +173,68 @@ async function callOpenRouter(
   apiKey: string,
   model?: string,
 ): Promise<any> {
-  const chosenModel =
-    model || Deno.env.get("OPENROUTER_MODEL") || DEFAULT_MODEL;
-  console.log(`ai-chief: calling OpenRouter model=${chosenModel}`);
+  const chain = model ? [model] : MODEL_CHAIN;
+  console.log("MODEL_CHAIN =", chain);
 
-  const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": Deno.env.get("APP_URL") || "https://localhost",
-      "X-Title": "AI Chief of Staff",
-    },
-    body: JSON.stringify({
-      model: chosenModel,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-      response_format: { type: "json_object" },
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
+  let lastError: unknown;
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`OpenRouter ${response.status}: ${errText}`);
+  for (const chosenModel of chain) {
+    try {
+      console.log(`ai-chief: calling OpenRouter model=${chosenModel}`);
+
+      const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": Deno.env.get("APP_URL") || "https://localhost",
+          "X-Title": "AI Chief of Staff",
+        },
+        body: JSON.stringify({
+          model: chosenModel,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 2000,
+          response_format: { type: "json_object" },
+        }),
+        signal: AbortSignal.timeout(20000), // shorter timeout so we fail fast & move to next model
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`OpenRouter ${response.status}: ${errText}`);
+      }
+
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content || "";
+
+      console.log("RAW MODEL OUTPUT:", text || "(empty)");
+
+      if (!text.trim()) {
+        // Don't even try to parse — treat empty output as a failed attempt
+        throw new Error(`Model ${chosenModel} returned empty content`);
+      }
+
+      const clean = text.replace(/```json\n?|\n?```/g, "").trim();
+
+      try {
+        return JSON.parse(clean);
+      } catch {
+        const match = clean.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]);
+        throw new Error(`Could not parse JSON from: ${clean.slice(0, 200)}`);
+      }
+    } catch (err) {
+      console.warn(`ai-chief: model ${chosenModel} failed: ${err}`);
+      lastError = err;
+      // continue to next model in chain
+    }
   }
 
-  const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || "";
-  const clean = text.replace(/```json\n?|\n?```/g, "").trim();
-
-  try {
-    return JSON.parse(clean);
-  } catch {
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    throw new Error(`Could not parse JSON from: ${clean.slice(0, 200)}`);
-  }
+  throw new Error(`All OpenRouter models failed: ${lastError}`);
 }
 
 // ---------- Ollama Fallback ----------
@@ -250,9 +278,12 @@ async function aiGenerate(
   schema: z.ZodTypeAny,
   heuristicFn: () => any,
 ): Promise<AIResponse> {
+  console.log("🔥🔥🔥 AI-CHIEF BUILD v999 - June 30 Debug 🔥🔥🔥");
   // Tier 1: OpenRouter
   if (apiKey) {
     try {
+      console.log(`[${action}] Starting OpenRouter`);
+
       const rawData = await callOpenRouter(systemPrompt, userPrompt, apiKey);
       // Validate & clean data using Zod. If AI sent malformed data, this catches it.
       const safeData = schema.parse(
@@ -266,6 +297,7 @@ async function aiGenerate(
         timestamp: new Date().toISOString(),
       };
     } catch (err) {
+      console.error(err);
       const msg = String(err);
       console.warn(
         `ai-chief: OpenRouter failed/malformed for ${action}: ${msg}`,
@@ -362,10 +394,26 @@ function heuristicBreakdown(
 ): any {
   // Analyze goal to create more intelligent breakdown
   const goalLower = goal.toLowerCase();
-  const isStudy = goalLower.includes('study') || goalLower.includes('learn') || goalLower.includes('review') || goalLower.includes('exam');
-  const isProject = goalLower.includes('build') || goalLower.includes('create') || goalLower.includes('project') || goalLower.includes('app') || goalLower.includes('website');
-  const isWriting = goalLower.includes('write') || goalLower.includes('essay') || goalLower.includes('article');
-  const isExercise = goalLower.includes('workout') || goalLower.includes('exercise') || goalLower.includes('run') || goalLower.includes('gym');
+  const isStudy =
+    goalLower.includes("study") ||
+    goalLower.includes("learn") ||
+    goalLower.includes("review") ||
+    goalLower.includes("exam");
+  const isProject =
+    goalLower.includes("build") ||
+    goalLower.includes("create") ||
+    goalLower.includes("project") ||
+    goalLower.includes("app") ||
+    goalLower.includes("website");
+  const isWriting =
+    goalLower.includes("write") ||
+    goalLower.includes("essay") ||
+    goalLower.includes("article");
+  const isExercise =
+    goalLower.includes("workout") ||
+    goalLower.includes("exercise") ||
+    goalLower.includes("run") ||
+    goalLower.includes("gym");
 
   let subtasks = [];
   let estimatedHours = 1.5;
@@ -373,33 +421,131 @@ function heuristicBreakdown(
   if (isStudy || isProject) {
     // More detailed breakdown for complex tasks
     subtasks = [
-      { title: `${goal}: Research & Planning`, estimatedMinutes: 30, priority: "high", mood: "reflective", timeBlock: "morning", dayOffset: 0 },
-      { title: `${goal}: Core Implementation`, estimatedMinutes: 60, priority: "high", mood: "high-strain", timeBlock: "morning", dayOffset: 0 },
-      { title: `${goal}: Development`, estimatedMinutes: 60, priority: "high", mood: "high-strain", timeBlock: "afternoon", dayOffset: 1 },
-      { title: `${goal}: Testing & Refinement`, estimatedMinutes: 45, priority: "medium", mood: "reflective", timeBlock: "afternoon", dayOffset: 1 },
-      { title: `${goal}: Final Review`, estimatedMinutes: 20, priority: "medium", mood: "reflective", timeBlock: "evening", dayOffset: 2 },
+      {
+        title: `${goal}: Research & Planning`,
+        estimatedMinutes: 30,
+        priority: "high",
+        mood: "reflective",
+        timeBlock: "morning",
+        dayOffset: 0,
+      },
+      {
+        title: `${goal}: Core Implementation`,
+        estimatedMinutes: 60,
+        priority: "high",
+        mood: "high-strain",
+        timeBlock: "morning",
+        dayOffset: 0,
+      },
+      {
+        title: `${goal}: Development`,
+        estimatedMinutes: 60,
+        priority: "high",
+        mood: "high-strain",
+        timeBlock: "afternoon",
+        dayOffset: 1,
+      },
+      {
+        title: `${goal}: Testing & Refinement`,
+        estimatedMinutes: 45,
+        priority: "medium",
+        mood: "reflective",
+        timeBlock: "afternoon",
+        dayOffset: 1,
+      },
+      {
+        title: `${goal}: Final Review`,
+        estimatedMinutes: 20,
+        priority: "medium",
+        mood: "reflective",
+        timeBlock: "evening",
+        dayOffset: 2,
+      },
     ];
     estimatedHours = 3.75;
   } else if (isWriting) {
     subtasks = [
-      { title: `${goal}: Outline & Structure`, estimatedMinutes: 20, priority: "high", mood: "reflective", timeBlock: "morning", dayOffset: 0 },
-      { title: `${goal}: First Draft`, estimatedMinutes: 45, priority: "high", mood: "high-strain", timeBlock: "afternoon", dayOffset: 0 },
-      { title: `${goal}: Edit & Polish`, estimatedMinutes: 30, priority: "medium", mood: "reflective", timeBlock: "evening", dayOffset: 1 },
+      {
+        title: `${goal}: Outline & Structure`,
+        estimatedMinutes: 20,
+        priority: "high",
+        mood: "reflective",
+        timeBlock: "morning",
+        dayOffset: 0,
+      },
+      {
+        title: `${goal}: First Draft`,
+        estimatedMinutes: 45,
+        priority: "high",
+        mood: "high-strain",
+        timeBlock: "afternoon",
+        dayOffset: 0,
+      },
+      {
+        title: `${goal}: Edit & Polish`,
+        estimatedMinutes: 30,
+        priority: "medium",
+        mood: "reflective",
+        timeBlock: "evening",
+        dayOffset: 1,
+      },
     ];
     estimatedHours = 1.58;
   } else if (isExercise) {
     subtasks = [
-      { title: `${goal}: Warm-up & Prep`, estimatedMinutes: 10, priority: "high", mood: "energizing", timeBlock: "morning", dayOffset: 0 },
-      { title: `${goal}: Main Activity`, estimatedMinutes: 40, priority: "high", mood: "energizing", timeBlock: "morning", dayOffset: 0 },
-      { title: `${goal}: Cool-down`, estimatedMinutes: 10, priority: "medium", mood: "reflective", timeBlock: "afternoon", dayOffset: 0 },
+      {
+        title: `${goal}: Warm-up & Prep`,
+        estimatedMinutes: 10,
+        priority: "high",
+        mood: "energizing",
+        timeBlock: "morning",
+        dayOffset: 0,
+      },
+      {
+        title: `${goal}: Main Activity`,
+        estimatedMinutes: 40,
+        priority: "high",
+        mood: "energizing",
+        timeBlock: "morning",
+        dayOffset: 0,
+      },
+      {
+        title: `${goal}: Cool-down`,
+        estimatedMinutes: 10,
+        priority: "medium",
+        mood: "reflective",
+        timeBlock: "afternoon",
+        dayOffset: 0,
+      },
     ];
     estimatedHours = 1.0;
   } else {
     // Generic balanced breakdown
     subtasks = [
-      { title: `${goal}: Getting Started`, estimatedMinutes: 25, priority: "high", mood: "energizing", timeBlock: "morning", dayOffset: 0 },
-      { title: `${goal}: Progress`, estimatedMinutes: 45, priority: "high", mood: "high-strain", timeBlock: "afternoon", dayOffset: 0 },
-      { title: `${goal}: Completion`, estimatedMinutes: 20, priority: "medium", mood: "reflective", timeBlock: "evening", dayOffset: 1 },
+      {
+        title: `${goal}: Getting Started`,
+        estimatedMinutes: 25,
+        priority: "high",
+        mood: "energizing",
+        timeBlock: "morning",
+        dayOffset: 0,
+      },
+      {
+        title: `${goal}: Progress`,
+        estimatedMinutes: 45,
+        priority: "high",
+        mood: "high-strain",
+        timeBlock: "afternoon",
+        dayOffset: 0,
+      },
+      {
+        title: `${goal}: Completion`,
+        estimatedMinutes: 20,
+        priority: "medium",
+        mood: "reflective",
+        timeBlock: "evening",
+        dayOffset: 1,
+      },
     ];
     estimatedHours = 1.5;
   }
@@ -538,7 +684,7 @@ function heuristicRecovery(
 
   // Calculate current load per day
   const dayLoad: Record<string, number> = {};
-  weekDates.forEach(d => dayLoad[d] = 0);
+  weekDates.forEach((d) => (dayLoad[d] = 0));
   tasks.forEach((t: any) => {
     if (weekDates.includes(t.date)) {
       dayLoad[t.date] = (dayLoad[t.date] || 0) + 1;
@@ -566,7 +712,7 @@ function heuristicRecovery(
     taskId: task.id,
     fromDate: task.date,
     toDate: getLeastLoadedDay(idx),
-    reason: `Rescheduled to ${dayLoad[getLeastLoadedDay(idx)] === 0 ? 'free day' : 'lighter day'}`,
+    reason: `Rescheduled to ${dayLoad[getLeastLoadedDay(idx)] === 0 ? "free day" : "lighter day"}`,
   }));
 
   return {
@@ -652,6 +798,7 @@ Deno.serve(async (req) => {
 
   try {
     const apiKey = Deno.env.get("OPENROUTER_API_KEY") || null;
+    console.log("Has OpenRouter key?", apiKey ? "YES" : "NO");
     if (!apiKey)
       console.warn(
         "ai-chief: No OPENROUTER_API_KEY — will use Ollama/heuristics only",
@@ -708,7 +855,7 @@ Deno.serve(async (req) => {
         () => {
           // Calculate existing task load per day
           const dayLoad: Record<string, number> = {};
-          weekDates.forEach(d => dayLoad[d] = 0);
+          weekDates.forEach((d: string | number) => (dayLoad[d] = 0));
           (existingTasks || []).forEach((t: any) => {
             if (weekDates.includes(t.date)) {
               dayLoad[t.date] = (dayLoad[t.date] || 0) + 1;
@@ -716,32 +863,42 @@ Deno.serve(async (req) => {
           });
 
           // Find least loaded days
-          const sortedDays = Object.entries(dayLoad).sort((a, b) => a[1] - b[1]).map(([d]) => d);
+          const sortedDays = Object.entries(dayLoad)
+            .sort((a, b) => a[1] - b[1])
+            .map(([d]) => d);
 
-          const goalsList = (goals as string).split("\n").filter((g: string) => g.trim());
+          const goalsList = (goals as string)
+            .split("\n")
+            .filter((g: string) => g.trim());
           const maxGoals = 10; // Increased from 5
-          const assignments = goalsList.slice(0, maxGoals).map((g: string, i: number) => {
-            // Distribute to least loaded days
-            const dayIndex = i % sortedDays.length;
-            const targetDay = sortedDays[dayIndex];
-            const dayOffset = weekDates.indexOf(targetDay);
+          const assignments = goalsList
+            .slice(0, maxGoals)
+            .map((g: string, i: number) => {
+              // Distribute to least loaded days
+              const dayIndex = i % sortedDays.length;
+              const targetDay = sortedDays[dayIndex];
+              const dayOffset = weekDates.indexOf(targetDay);
 
-            // Assign time block based on position
-            const timeBlock = i % 3 === 0 ? "morning" : i % 3 === 1 ? "afternoon" : "evening";
+              // Assign time block based on position
+              const timeBlock =
+                i % 3 === 0 ? "morning" : i % 3 === 1 ? "afternoon" : "evening";
 
-            return {
-              title: g.trim(),
-              dayOffset,
-              priority: "medium",
-              mood: "routine",
-              timeBlock,
-            };
-          });
+              return {
+                title: g.trim(),
+                dayOffset,
+                priority: "medium",
+                mood: "routine",
+                timeBlock,
+              };
+            });
 
-          const overloadedDays = Object.entries(dayLoad).filter(([, count]) => count >= 5).map(([d]) => d);
-          const rationale = overloadedDays.length > 0
-            ? `Balanced across ${weekDates.length} days. Avoiding overloaded days: ${overloadedDays.join(", ")}`
-            : "Tasks distributed evenly across the week to maintain balance.";
+          const overloadedDays = Object.entries(dayLoad)
+            .filter(([, count]) => count >= 5)
+            .map(([d]) => d);
+          const rationale =
+            overloadedDays.length > 0
+              ? `Balanced across ${weekDates.length} days. Avoiding overloaded days: ${overloadedDays.join(", ")}`
+              : "Tasks distributed evenly across the week to maintain balance.";
 
           return { rationale, assignments };
         },
@@ -856,16 +1013,187 @@ Deno.serve(async (req) => {
 
     // ===== CHAT =====
     if (action === "chat") {
-      const { message, tasks, todayDate } = body;
+      const { message, tasks, todayDate, weekDates } = body;
+      console.log("========== CHAT REQUEST ==========");
+      console.log("Message:", body.message);
+      console.log("Tasks:", body.tasks?.length);
+      console.log("Today:", body.todayDate);
+      console.log("WeekDates:", body.weekDates);
+      const ChatActionSchema = z
+        .object({
+          type: z
+            .enum(["add", "move", "reschedule", "priority", "delete", "none"])
+            .catch("none"),
+          taskTitle: z.coerce.string().optional(),
+          targetDate: z.coerce.string().optional(),
+          newPriority: z.enum(["low", "medium", "high"]).optional(),
+        })
+        .optional();
+
+      const ChatSchema = z.object({
+        response: z.coerce
+          .string()
+          .catch("I understand. How can I help you with your tasks?"),
+        action: ChatActionSchema,
+      });
+
+      // Heuristic fallback for when AI fails - simple keyword-based matching
+      const heuristicChat = (
+        msg: string,
+        taskList: any[],
+        currentDate: string,
+        dates: string[],
+      ): any => {
+        const lower = (msg || "").trim().toLowerCase();
+        console.log("heuristicChat processing:", msg);
+
+        // Check for add/create keywords anywhere in message
+        if (
+          lower.includes("add ") ||
+          lower.includes("create ") ||
+          lower.startsWith("new ")
+        ) {
+          // Extract the task name after the keyword
+          const addMatch = lower.match(
+            /(?:add|create|new)\s+(?:a\s+)?(?:task\s+)?(?:called\s+)?(.+)/i,
+          );
+          if (addMatch && addMatch[1]) {
+            const title = addMatch[1].replace(/\?.*$/, "").trim(); // Remove anything after ?
+            console.log("heuristicChat: matched add:", title);
+            return {
+              response: `Added "${title}" to today.`,
+              action: { type: "add", taskTitle: title, newPriority: "medium" },
+            };
+          }
+          // Try simpler extraction
+          const simpleAdd = lower
+            .replace(/^(add|create|new)\s+(?:a\s+)?(?:task\s+)?/i, "")
+            .trim();
+          if (simpleAdd.length > 0) {
+            console.log("heuristicChat: matched add (simple):", simpleAdd);
+            return {
+              response: `Added "${simpleAdd}" to today.`,
+              action: {
+                type: "add",
+                taskTitle: simpleAdd,
+                newPriority: "medium",
+              },
+            };
+          }
+        }
+
+        // Check for delete/remove keywords
+        if (lower.includes("delete ") || lower.includes("remove ")) {
+          const deleteMatch = lower.match(
+            /(?:delete|remove)\s+(?:the\s+)?(?:task\s+)?(?:called\s+)?(.+)/i,
+          );
+          if (deleteMatch && deleteMatch[1]) {
+            const title = deleteMatch[1].replace(/\?.*$/, "").trim();
+            console.log("heuristicChat: matched delete:", title);
+            return {
+              response: `Removed "${title}".`,
+              action: { type: "delete", taskTitle: title },
+            };
+          }
+          const simpleDelete = lower
+            .replace(/^(delete|remove)\s+(?:the\s+)?(?:task\s+)?/i, "")
+            .trim();
+          if (simpleDelete.length > 0) {
+            console.log(
+              "heuristicChat: matched delete (simple):",
+              simpleDelete,
+            );
+            return {
+              response: `Removed "${simpleDelete}".`,
+              action: { type: "delete", taskTitle: simpleDelete },
+            };
+          }
+        }
+
+        // Check for move/reschedule keywords
+        if (
+          (lower.includes("move ") || lower.includes("reschedule ")) &&
+          lower.includes(" to ")
+        ) {
+          const parts = lower.split(" to ");
+          if (parts.length >= 2) {
+            const titlePart = parts[0]
+              .replace(/^(move|reschedule)\s+(?:the\s+)?(?:task\s+)?/i, "")
+              .trim();
+            const targetRaw = parts[1].replace(/\?.*$/, "").trim();
+            const dayIdx = [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday",
+            ].indexOf(targetRaw.toLowerCase());
+            const targetDate = dayIdx >= 0 && dates ? dates[dayIdx] : undefined;
+            if (titlePart && targetDate) {
+              console.log(
+                "heuristicChat: matched move:",
+                titlePart,
+                "to",
+                targetDate,
+              );
+              return {
+                response: `Moved "${titlePart}" to ${targetRaw}.`,
+                action: { type: "move", taskTitle: titlePart, targetDate },
+              };
+            }
+          }
+        }
+
+        // Check for priority change
+        if (
+          lower.includes("priority") ||
+          lower.includes("high priority") ||
+          lower.includes("low priority")
+        ) {
+          const priorityMatch = lower.match(
+            /(?:set|change|make)\s+(?:the\s+)?(?:task\s+)?(.+?)\s+(?:to|as)\s+(high|medium|low)/i,
+          );
+          if (priorityMatch && priorityMatch[1] && priorityMatch[2]) {
+            console.log(
+              "heuristicChat: matched priority:",
+              priorityMatch[1],
+              "->",
+              priorityMatch[2],
+            );
+            return {
+              response: `Updated priority for "${priorityMatch[1]}" to ${priorityMatch[2]}.`,
+              action: {
+                type: "priority",
+                taskTitle: priorityMatch[1].trim(),
+                newPriority: priorityMatch[2] as "high" | "medium" | "low",
+              },
+            };
+          }
+        }
+
+        console.log("heuristicChat: no match");
+        return {
+          response: "I understand. How can I help you with your tasks?",
+        };
+      };
+
       const result = await aiGenerate(
         "chat",
-        `${BASE_SYSTEM}\nYou are a helpful AI Chief of Staff. Respond naturally and conversationally. If the user asks to add/modify tasks, suggest specific actions.`,
-        `User message: ${message}\nCurrent tasks: ${JSON.stringify(tasks)}\nToday: ${todayDate}`,
+        `${BASE_SYSTEM}
+You are a helpful, conversational AI Chief of Staff embedded in a task planner.
+If the user's message requests a task action, include an "action" object; otherwise omit it.
+Action types:
+- "add": new task. Fields: taskTitle (required), newPriority (optional, default medium).
+- "move"/"reschedule": move an existing task. Fields: taskTitle (must match an existing task's title), targetDate (YYYY-MM-DD).
+- "priority": change priority. Fields: taskTitle, newPriority.
+- "delete": remove a task. Fields: taskTitle.
+Return JSON: { response: string, action?: { type, taskTitle?, targetDate?, newPriority? } }`,
+        `User message: ${message}\nCurrent tasks: ${JSON.stringify(tasks?.slice(0, 15) || [])}\nToday: ${todayDate}\nWeek dates: ${(weekDates || []).join(", ")}`,
         apiKey,
-        z.object({ response: z.coerce.string() }),
-        () => ({
-          response: "I understand. How can I help you with your tasks today? You can ask me to plan your week, break down goals, or give you advice.",
-        }),
+        ChatSchema,
+        () => heuristicChat(message, tasks, todayDate, weekDates),
       );
       return json(result);
     }

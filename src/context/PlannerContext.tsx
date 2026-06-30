@@ -5,6 +5,8 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
+  useRef,
 } from "react";
 import type {
   LightingMode,
@@ -26,6 +28,18 @@ import type {
 } from "@/types/planner";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSeasonalEngine } from "@/hooks/useSeasonalEngine";
+// Scheduling Engine imports
+import {
+  computeWeekConfidence,
+  computeTaskRisk as engineComputeTaskRisk,
+  recoverWeek,
+  rescheduleMissed,
+  scheduleNewGoal,
+  executeChatCommand,
+  joinReplay,
+  type ChatCommand,
+} from "@/SchedulingEngine";
+import { buildEngineContext } from "@/lib/scheduling/adapter";
 import { supabase } from "@/integrations/supabase/client";
 
 // 🌿 Living Video Assets
@@ -398,8 +412,9 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const todayDateObj = new Date();
   const todayDayId = `${todayDateObj.getFullYear()}-${String(todayDateObj.getMonth() + 1).padStart(2, "0")}-${String(todayDateObj.getDate()).padStart(2, "0")}`;
 
-  const currentWeekDates = getWeekDates(weekOffset);
-  const days = buildDays(tasks, currentWeekDates);
+  // Memoize week dates and days to prevent unnecessary recalculations
+  const currentWeekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
+  const days = useMemo(() => buildDays(tasks, currentWeekDates), [tasks, currentWeekDates]);
   const season = useSeasonalEngine(tasks);
 
   const setMode = useCallback((m: LightingMode) => {
@@ -467,26 +482,71 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Recurrence
+  // Cleanup duplicate recurring tasks - run once on mount
+  const hasCleanedDuplicates = useRef(false);
   useEffect(() => {
-    const recurringTemplates = tasks.filter((t) => t.recurrence);
-    if (recurringTemplates.length === 0) return;
+    if (hasCleanedDuplicates.current) return;
+
+    // Find and remove duplicate recurring tasks
+    const seen = new Map<string, string>(); // "title_date" -> taskId
+    const tasksToRemove: string[] = [];
+
+    tasks.forEach((t) => {
+      if (!t.recurrence) return;
+      const key = `${t.title}_${t.date}`;
+      if (seen.has(key)) {
+        // Keep the one that was created earlier, remove duplicates
+        tasksToRemove.push(t.id);
+      } else {
+        seen.set(key, t.id);
+      }
+    });
+
+    if (tasksToRemove.length > 0) {
+      setTasks((prev) => prev.filter((t) => !tasksToRemove.includes(t.id)));
+    }
+
+    hasCleanedDuplicates.current = true;
+  }, []);
+
+  // Recurrence - only generate for current week to prevent duplicates
+  const hasGeneratedRecurring = useRef(false);
+  useEffect(() => {
+    // Only run once per session to prevent duplicates
+    if (hasGeneratedRecurring.current) return;
+
+    const recurringTemplates = tasks.filter((t) => t.recurrence && !t.id.startsWith('r'));
+    if (recurringTemplates.length === 0) {
+      hasGeneratedRecurring.current = true;
+      return;
+    }
+
     const newTasks: Task[] = [];
+    const today = new Date().toISOString().split('T')[0];
+
     for (const template of recurringTemplates) {
       const datesToGenerate: string[] = [];
-      if (template.recurrence === "daily")
-        datesToGenerate.push(...currentWeekDates);
-      else if (template.recurrence === "weekday")
-        datesToGenerate.push(...currentWeekDates.slice(0, 5));
-      else if (template.recurrence === "weekly") {
+      if (template.recurrence === "daily") {
+        // Only generate for today and future within current week
+        datesToGenerate.push(...currentWeekDates.filter(d => d >= today));
+      } else if (template.recurrence === "weekday") {
+        // Only weekdays, and only today/future
+        const weekdays = currentWeekDates.filter(d => {
+          const day = new Date(d).getDay();
+          return day >= 1 && day <= 5 && d >= today;
+        });
+        datesToGenerate.push(...weekdays);
+      } else if (template.recurrence === "weekly") {
         const origDayOfWeek = new Date(template.date).getDay();
         const mappedIdx = origDayOfWeek === 0 ? 6 : origDayOfWeek - 1;
-        if (currentWeekDates[mappedIdx])
+        if (currentWeekDates[mappedIdx] && currentWeekDates[mappedIdx] >= today)
           datesToGenerate.push(currentWeekDates[mappedIdx]);
       }
+
       for (const dateStr of datesToGenerate) {
+        // More strict duplicate check - check if any task with similar properties exists
         const exists = tasks.some(
-          (t) => t.title === template.title && t.date === dateStr,
+          (t) => t.title === template.title && t.date === dateStr && t.recurrence === template.recurrence,
         );
         if (!exists) {
           newTasks.push({
@@ -500,8 +560,12 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    if (newTasks.length > 0) setTasks((prev) => [...prev, ...newTasks]);
-  }, [weekOffset]);
+
+    if (newTasks.length > 0) {
+      setTasks((prev) => [...prev, ...newTasks]);
+    }
+    hasGeneratedRecurring.current = true;
+  }, [currentWeekDates]);
 
   const toggleTask = useCallback(
     (taskId: string) =>
@@ -720,56 +784,46 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Confidence Engine
+  // Confidence Engine - uses local Scheduling Engine
   const computeConfidence = useCallback(async () => {
-    const data = await invokeAI("confidence", {
-      tasks: tasks.map((t) => ({
-        id: t.id,
-        title: t.title,
-        date: t.date,
-        completed: t.completed,
-        priority: t.priority,
-      })),
-      todayDate: todayDayId,
+    const ctx = buildEngineContext({
+      tasks,
+      calendarEvents: [],
       weekDates: currentWeekDates,
+      todayDate: todayDayId,
       focusSessions,
     });
-    if (data) {
-      setConfidence(data as ConfidenceScore);
-    }
-  }, [tasks, todayDayId, currentWeekDates, focusSessions, invokeAI]);
+    const result = computeWeekConfidence(ctx);
+    setConfidence({
+      overall: result.score,
+      momentum: "flat",
+      completedToday: tasks.filter((t) => t.date === todayDayId && t.completed).length,
+      totalToday: tasks.filter((t) => t.date === todayDayId).length,
+      overdueCount: tasks.filter((t) => !t.completed && t.date < todayDayId).length,
+      riskTasks: result.metrics.conflictCount,
+      reasoning: result.explanation,
+    });
+  }, [tasks, todayDayId, currentWeekDates, focusSessions]);
 
-  // Task Risk
+  // Task Risk - uses local Scheduling Engine
   const computeTaskRisk = useCallback(
     async (taskId: string): Promise<TaskRisk> => {
       const task = tasks.find((t) => t.id === taskId);
       if (!task) return "low";
-      const data = await invokeAI("risk", {
-        task: {
-          id: task.id,
-          title: task.title,
-          date: task.date,
-          priority: task.priority,
-          estimatedMinutes: 60,
-        },
-        tasks: tasks.map((t) => ({
-          id: t.id,
-          title: t.title,
-          date: t.date,
-          completed: t.completed,
-          priority: t.priority,
-        })),
-        todayDate: todayDayId,
+      const ctx = buildEngineContext({
+        tasks,
+        calendarEvents: [],
         weekDates: currentWeekDates,
+        todayDate: todayDayId,
+        focusSessions,
       });
-      if (data) {
-        const risk = (data as { risk: TaskRisk }).risk;
-        setTaskRisks((prev) => ({ ...prev, [taskId]: risk }));
-        return risk;
-      }
-      return "low";
+      const schedTask = ctx.tasks.find((t) => t.id === taskId);
+      if (!schedTask) return "low";
+      const result = engineComputeTaskRisk(schedTask, ctx);
+      setTaskRisks((prev) => ({ ...prev, [taskId]: result.risk }));
+      return result.risk;
     },
-    [tasks, todayDayId, currentWeekDates, invokeAI],
+    [tasks, todayDayId, currentWeekDates, focusSessions],
   );
 
   // AI Explanations
@@ -819,45 +873,49 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     [snapshots, setTasks, setJournal, setSnapshots],
   );
 
-  // Recovery Mode
+  // Recovery Mode - uses local Scheduling Engine
   const runRecovery = useCallback(async (): Promise<boolean> => {
     createSnapshot("Before recovery");
-    const data = await invokeAI("recovery", {
-      tasks: tasks.map((t) => ({
-        id: t.id,
-        title: t.title,
-        date: t.date,
-        completed: t.completed,
-        priority: t.priority,
-        timeBlock: t.timeBlock,
-      })),
-      todayDate: todayDayId,
+    const ctx = buildEngineContext({
+      tasks,
+      calendarEvents: [],
       weekDates: currentWeekDates,
+      todayDate: todayDayId,
       focusSessions,
     });
-    if (data) {
-      const proposal = data as RecoveryProposal;
-      setRecoveryProposal(proposal);
-      // Apply changes
-      for (const change of proposal.changes) {
-        if (change.type === "move" && change.toDate) {
-          moveTask(change.taskId, change.toDate);
-        } else if (change.type === "remove") {
-          deleteTask(change.taskId);
-        }
-      }
-      // Add explanation
-      addExplanation({
-        action: "recovery",
-        taskId: undefined,
-        reason: proposal.summary,
-        confidence: proposal.newConfidence,
-        model: "gemini-2.5-pro",
-        details: { changes: proposal.changes },
-      });
-      return true;
+    const outcome = recoverWeek(ctx);
+
+    if (outcome.result.moves.length === 0) return false;
+
+    // Apply moves
+    for (const move of outcome.result.moves) {
+      moveTask(move.taskId, move.toDate);
     }
-    return false;
+
+    // Add explanation
+    addExplanation({
+      action: "recovery",
+      taskId: undefined,
+      reason: joinReplay(outcome.narrative),
+      confidence: outcome.confidenceAfter ?? 0,
+      model: "scheduling-engine",
+      details: { changes: outcome.result.moves },
+    });
+
+    setRecoveryProposal({
+      summary: outcome.narrative[outcome.narrative.length - 1] ?? "Recovery complete.",
+      changes: outcome.result.moves.map((m) => ({
+        type: "move" as const,
+        taskId: m.taskId,
+        fromDate: m.fromDate,
+        toDate: m.toDate,
+        reason: m.reason,
+      })),
+      newConfidence: outcome.confidenceAfter ?? 0,
+      oldConfidence: outcome.confidenceBefore ?? 0,
+    });
+
+    return true;
   }, [
     tasks,
     todayDayId,
@@ -870,7 +928,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     invokeAI,
   ]);
 
-  // Autonomous Rescheduling
+  // Autonomous Rescheduling - uses local Scheduling Engine
   const checkAndReschedule = useCallback(async (): Promise<boolean> => {
     const overdueTasks = tasks.filter(
       (t) => !t.completed && t.date < todayDayId,
@@ -878,45 +936,79 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     if (overdueTasks.length === 0) return false;
 
     createSnapshot("Before autonomous reschedule");
-    const data = await invokeAI("reschedule", {
-      missedTasks: overdueTasks.map((t) => ({
-        id: t.id,
-        title: t.title,
-        date: t.date,
-        priority: t.priority,
-      })),
+    const ctx = buildEngineContext({
+      tasks,
+      calendarEvents: [],
       weekDates: currentWeekDates,
-      existingTasks: tasks
-        .filter((t) => currentWeekDates.includes(t.date))
-        .map((t) => ({ title: t.title, date: t.date, completed: t.completed })),
+      todayDate: todayDayId,
+      focusSessions,
     });
-    if (data) {
-      const rescheduleResult = data as {
-        moves: Array<{ taskId: string; newDate: string; reason: string }>;
-      };
-      // Apply moves
-      for (const move of rescheduleResult.moves) {
-        moveTask(move.taskId, move.newDate);
-        addExplanation({
-          action: "reschedule",
-          taskId: move.taskId,
-          reason: move.reason,
-          confidence: 85,
-          model: "gemini-2.5-flash",
-        });
-      }
-      return true;
+    const schedOverdue = ctx.tasks.filter((t) => overdueTasks.some((o) => o.id === t.id));
+    const outcome = rescheduleMissed(schedOverdue, ctx);
+
+    // Apply moves
+    for (const placed of outcome.result) {
+      moveTask(placed.id, placed.date);
+      addExplanation({
+        action: "reschedule",
+        taskId: placed.id,
+        reason: `Rescheduled by the Scheduling Engine — ${placed.date}.`,
+        confidence: outcome.confidenceAfter ?? 85,
+        model: "scheduling-engine",
+      });
     }
-    return false;
+    return outcome.result.length > 0;
   }, [
     tasks,
     todayDayId,
     currentWeekDates,
+    focusSessions,
     createSnapshot,
     moveTask,
     addExplanation,
-    invokeAI,
   ]);
+
+  // Apply AI breakdown through the Scheduling Engine
+  const applyAIBreakdown = useCallback(
+    (subtasks: Array<{
+      title: string;
+      estimatedMinutes: number;
+      priority: TaskMood extends string ? TaskMood : never;
+      mood?: TaskMood;
+      timeBlock?: TimeBlock;
+    }>) => {
+      createSnapshot("Before goal scheduling");
+      const ctx = buildEngineContext({
+        tasks,
+        calendarEvents: [],
+        weekDates: currentWeekDates,
+        todayDate: todayDayId,
+        focusSessions,
+      });
+      const candidates = subtasks.map((s, i) => ({
+        id: `goal_${Date.now()}_${i}`,
+        title: s.title,
+        completed: false,
+        priority: s.priority as "low" | "medium" | "high",
+        estimatedMinutes: s.estimatedMinutes,
+        mood: s.mood,
+        timeBlock: s.timeBlock,
+        source: "ai" as const,
+      }));
+      const outcome = scheduleNewGoal(candidates, ctx);
+      for (const placed of outcome.result) {
+        addTask(placed.date, placed.title, placed.priority, placed.mood, placed.timeBlock);
+      }
+      addExplanation({
+        action: "schedule",
+        reason: joinReplay(outcome.narrative),
+        confidence: outcome.confidenceAfter ?? 0,
+        model: "scheduling-engine",
+        details: { placed: outcome.result },
+      });
+    },
+    [tasks, todayDayId, currentWeekDates, focusSessions, createSnapshot, addTask, addExplanation],
+  );
 
   // Compute confidence on mount and when tasks change significantly
   useEffect(() => {

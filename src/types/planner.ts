@@ -29,6 +29,9 @@ export interface Task {
   subIntentions?: SubIntention[];
   recurrence?: TaskRecurrence;
   sortOrder?: number;
+  // Scheduling engine fields
+  estimatedMinutes?: number;
+  dependsOn?: string[];
 }
 
 export interface Day {

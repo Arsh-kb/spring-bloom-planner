@@ -11,6 +11,8 @@ import { CompletionSparkle } from './CompletionSparkle';
 interface DayCardProps {
   day: Day;
   isToday: boolean;
+  isExpanded: boolean;
+  weekConfidence?: number;
   onZoom?: (day: Day) => void;
 }
 
@@ -33,7 +35,7 @@ const timeBlockTints: Record<string, { bg: string; label: string }> = {
   evening: { bg: 'hsla(220, 40%, 60%, 0.08)', label: 'Evening' },
 };
 
-export function DayCard({ day, isToday, onZoom }: DayCardProps) {
+export function DayCard({ day, isToday, isExpanded, weekConfidence, onZoom }: DayCardProps) {
   const { addTask, enterDeepFocus } = usePlanner();
   const [newTaskText, setNewTaskText] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
@@ -123,68 +125,104 @@ export function DayCard({ day, isToday, onZoom }: DayCardProps) {
         <FloraGrowth day={day} isHeader />
       </div>
 
-      {/* --- Tasks Content - stronger scrim --- */}
-      <div className="p-3 space-y-1 flex-1 flex flex-col relative">
-        {/* Dark scrim behind task content for readability */}
-        <div className="absolute inset-0 bg-background/60 pointer-events-none rounded-b-lg" />
-        
-        <div className="relative z-[1]">
-          <SortableContext items={allTaskIds} strategy={verticalListSortingStrategy}>
-            {day.tasks.length === 0 && newTaskText === '' ? (
-              <p className="text-foreground/50 text-xs italic font-body py-2 drop-shadow-md">No tasks yet</p>
-            ) : (
-              <>
-                {ungrouped.map(task => <SortableTask key={task.id} task={task} />)}
-                {grouped.map(({ block, tasks }) => (
-                  <div key={block} className="mt-1">
-                    <div className="flex items-center gap-2 py-0.5 px-1 rounded" style={{ background: timeBlockTints[block].bg }}>
-                      <span className="text-[9px] font-display italic text-foreground/60 tracking-wide drop-shadow-sm">{timeBlockTints[block].label}</span>
-                      <div className="flex-1 h-px bg-foreground/15" />
-                    </div>
-                    {tasks.map(task => <SortableTask key={task.id} task={task} />)}
-                  </div>
-                ))}
-              </>
+      {/* --- Collapsed Summary --- */}
+      {!isExpanded && day.tasks.length > 0 && (
+        <div className="px-3 py-2 flex items-center justify-between text-[10px] font-body">
+          <div className="flex items-center gap-3">
+            <span className="text-foreground/60">
+              {completedCount}/{day.tasks.length} done
+            </span>
+            {day.tasks.length > 0 && (
+              <div className="flex items-center gap-1">
+                <div className="w-12 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${(completedCount / day.tasks.length) * 100}%`,
+                      backgroundColor: completedCount === day.tasks.length ? 'hsl(150, 60%, 45%)' : 'hsl(38, 60%, 55%)'
+                    }}
+                  />
+                </div>
+              </div>
             )}
-          </SortableContext>
-
-          <ShadowPlanning dayId={day.id} />
-
-          {/* Input Row */}
-          <div className="pt-2 mt-auto flex items-center gap-1.5 border-b border-foreground/15 focus-within:border-primary/40 transition-colors bg-black/15 rounded-t-sm px-1">
-            <button onClick={cyclePriority} className="flex-shrink-0 text-[12px] opacity-80 hover:scale-110 transition-transform drop-shadow-md">
-              {priority === 'high' ? '🍒' : priority === 'medium' ? '🌿' : '🍂'}
-            </button>
-            <button onClick={cycleMood} className="flex-shrink-0 w-[14px] h-[14px] rounded-full flex items-center justify-center hover:scale-110 transition-transform" title={mood || 'No mood'}>
-              {mood ? (
-                <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: moodDots[mood], boxShadow: `0 0 3px ${moodDots[mood]}` }} />
-              ) : (
-                <span className="w-[5px] h-[5px] rounded-full border border-foreground/30" />
-              )}
-            </button>
-            <button onClick={cycleTimeBlock} className="flex-shrink-0 text-[10px] opacity-80 hover:scale-110 transition-transform" title={timeBlock || 'No time block'}>
-              {timeBlock ? timeBlockIcons[timeBlock] : '⏱'}
-            </button>
-            <button onClick={cycleRecurrence} className="flex-shrink-0 text-[10px] opacity-80 hover:scale-110 transition-transform" title={recurrence ? `Recurs: ${recurrence}` : 'No recurrence'}>
-              {recurrence ? recurrenceLabels[recurrence] : '↻'}
-            </button>
-            <input
-              type="text"
-              value={newTaskText}
-              onChange={e => setNewTaskText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddTask()}
-              placeholder="Add task..."
-              className="w-full bg-transparent text-xs font-body text-foreground placeholder:text-foreground/40 outline-none py-1 drop-shadow-sm"
-            />
           </div>
-
-          {day.tasks.length > 0 && (
-            <div className="pt-1.5 border-t border-foreground/10 mt-1">
-              <span className="text-[10px] text-foreground/60 font-body block text-right drop-shadow-sm">{completedCount}/{day.tasks.length} done</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {weekConfidence !== undefined && (
+              <span className={`${weekConfidence >= 70 ? 'text-green-400/70' : weekConfidence >= 40 ? 'text-amber-400/70' : 'text-red-400/70'}`}>
+                {Math.round(weekConfidence)}%
+              </span>
+            )}
+            <span className="text-foreground/40">
+              {day.tasks.length} task{day.tasks.length !== 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* --- Tasks Content - stronger scrim --- */}
+      {isExpanded && (
+        <div className="p-3 space-y-1 flex-1 flex flex-col relative">
+          {/* Dark scrim behind task content for readability */}
+          <div className="absolute inset-0 bg-background/60 pointer-events-none rounded-b-lg" />
+
+          <div className="relative z-[1]">
+            <SortableContext items={allTaskIds} strategy={verticalListSortingStrategy}>
+              {day.tasks.length === 0 && newTaskText === '' ? (
+                <p className="text-foreground/50 text-xs italic font-body py-2 drop-shadow-md">No tasks yet</p>
+              ) : (
+                <>
+                  {ungrouped.map(task => <SortableTask key={task.id} task={task} />)}
+                  {grouped.map(({ block, tasks }) => (
+                    <div key={block} className="mt-1">
+                      <div className="flex items-center gap-2 py-0.5 px-1 rounded" style={{ background: timeBlockTints[block].bg }}>
+                        <span className="text-[9px] font-display italic text-foreground/60 tracking-wide drop-shadow-sm">{timeBlockTints[block].label}</span>
+                        <div className="flex-1 h-px bg-foreground/15" />
+                      </div>
+                      {tasks.map(task => <SortableTask key={task.id} task={task} />)}
+                    </div>
+                  ))}
+                </>
+              )}
+            </SortableContext>
+
+            <ShadowPlanning dayId={day.id} />
+
+            {/* Input Row */}
+            <div className="pt-2 mt-auto flex items-center gap-1.5 border-b border-foreground/15 focus-within:border-primary/40 transition-colors bg-black/15 rounded-t-sm px-1">
+              <button onClick={cyclePriority} className="flex-shrink-0 text-[12px] opacity-80 hover:scale-110 transition-transform drop-shadow-md">
+                {priority === 'high' ? '🍒' : priority === 'medium' ? '🌿' : '🍂'}
+              </button>
+              <button onClick={cycleMood} className="flex-shrink-0 w-[14px] h-[14px] rounded-full flex items-center justify-center hover:scale-110 transition-transform" title={mood || 'No mood'}>
+                {mood ? (
+                  <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: moodDots[mood], boxShadow: `0 0 3px ${moodDots[mood]}` }} />
+                ) : (
+                  <span className="w-[5px] h-[5px] rounded-full border border-foreground/30" />
+                )}
+              </button>
+              <button onClick={cycleTimeBlock} className="flex-shrink-0 text-[10px] opacity-80 hover:scale-110 transition-transform" title={timeBlock || 'No time block'}>
+                {timeBlock ? timeBlockIcons[timeBlock] : '⏱'}
+              </button>
+              <button onClick={cycleRecurrence} className="flex-shrink-0 text-[10px] opacity-80 hover:scale-110 transition-transform" title={recurrence ? `Recurs: ${recurrence}` : 'No recurrence'}>
+                {recurrence ? recurrenceLabels[recurrence] : '↻'}
+              </button>
+              <input
+                type="text"
+                value={newTaskText}
+                onChange={e => setNewTaskText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+                placeholder="Add task..."
+                className="w-full bg-transparent text-xs font-body text-foreground placeholder:text-foreground/40 outline-none py-1 drop-shadow-sm"
+              />
+            </div>
+
+            {day.tasks.length > 0 && (
+              <div className="pt-1.5 border-t border-foreground/10 mt-1">
+                <span className="text-[10px] text-foreground/60 font-body block text-right drop-shadow-sm">{completedCount}/{day.tasks.length} done</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

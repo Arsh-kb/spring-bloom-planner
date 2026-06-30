@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlanner } from "@/context/PlannerContext";
 import { toast } from "@/hooks/use-toast";
@@ -63,7 +63,7 @@ interface Notification {
   timestamp: number;
 }
 
-type Tab = "briefing" | "breakdown" | "schedule" | "report" | "chat";
+type Tab = "briefing" | "breakdown" | "schedule" | "report" | "chat" | "decisions";
 
 // ============ THINKING ANIMATION STEPS ============
 interface ThinkingStep {
@@ -204,6 +204,9 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
   const {
     tasks,
     addTask,
+    moveTask,
+    updateTaskDetails,
+    deleteTask,
     mode,
     currentWeekDates,
     todayDayId,
@@ -212,12 +215,14 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
     restoreSnapshot,
     snapshots,
     addExplanation,
+    explanations,
     focusSessions,
   } = usePlanner();
 
   // State
   const [tab, setTab] = useState<Tab>("briefing");
   const [loading, setLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [thinkingStep, setThinkingStep] = useState<string>("");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -244,6 +249,9 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
   const [dismissedNotifications, setDismissedNotifications] = useState<
     Set<string>
   >(new Set());
+
+  // Ref to track briefing fetch attempts per date (prevents infinite loops)
+  const briefingFetchRef = useRef<string | null>(null);
 
   const todayIdx = useMemo(
     () => currentWeekDates.indexOf(todayDayId),
@@ -316,52 +324,64 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
     [],
   );
 
-  // Invoke AI function
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const invoke = async (action: string, payload: Record<string, unknown>) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-chief", {
-        body: { action, ...payload },
-      });
-      if (error) throw error;
-      if (data?.error) {
-        if (data.kind === "rate_limit") {
-          toast({
-            title: "AI is handling another request",
-            description: "Give me just a moment to finish up.",
-          });
-        } else {
-          toast({
-            title: "Something unexpected happened",
-            description: data.error || "Let me try again.",
-            variant: "destructive",
-          });
+  // Invoke AI function - wrapped in useCallback for stable identity
+  const invoke = useCallback(
+    async (action: string, payload: Record<string, unknown>) => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("ai-chief", {
+          body: { action, ...payload },
+        });
+        if (error) throw error;
+        if (data?.error) {
+          if (data.kind === "rate_limit") {
+            toast({
+              title: "AI is handling another request",
+              description: "Give me just a moment to finish up.",
+            });
+          } else {
+            toast({
+              title: "Something unexpected happened",
+              description: data.error || "Let me try again.",
+              variant: "destructive",
+            });
+          }
+          return null;
         }
+        return data;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        toast({
+          title: "Connection issue",
+          description: "Please check your connection and try again.",
+          variant: "destructive",
+        });
         return null;
+      } finally {
+        setLoading(false);
+        setThinkingStep("");
+        setCompletedSteps(new Set());
+        setCurrentStepIndex(0);
       }
-      return data;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      toast({
-        title: "Connection issue",
-        description: "Please check your connection and try again.",
-        variant: "destructive",
-      });
-      return null;
-    } finally {
-      setLoading(false);
-      setThinkingStep("");
-      setCompletedSteps(new Set());
-      setCurrentStepIndex(0);
-    }
-  };
+    },
+    [], // stable forever — only touches stable setters + the stable `toast` import
+  );
 
-  // Auto-run morning briefing
+  // Auto-run morning briefing - ref-guarded to prevent infinite loops
   useEffect(() => {
     if (!open) return;
     if (tab !== "briefing") return;
+
+    // Already have a briefing for today — nothing to do.
     if (briefingDate === todayDayId && briefing) return;
+
+    // We've already attempted a fetch for this date (success OR failure).
+    // Don't auto-retry on every render — the user can hit 🔄 to force it.
+    if (briefingFetchRef.current === todayDayId) return;
+
+    briefingFetchRef.current = todayDayId;
+
+    let cancelled = false;
 
     (async () => {
       setLoading(true);
@@ -381,23 +401,27 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
         mode,
       });
 
+      if (cancelled) return;
+
       if (data) {
         setBriefing(data.data || data);
         setBriefingDate(todayDayId);
       }
       setLoading(false);
     })();
-  }, [
-    open,
-    tab,
-    todayDayId,
-    briefingDate,
-    briefing,
-    tasks,
-    mode,
-    invoke,
-    runThinkingAnimation,
-  ]);
+
+    return () => {
+      cancelled = true;
+    };
+    // Only re-run when the panel opens, the tab changes, or the day changes.
+    // `tasks`, `mode`, `invoke`, `runThinkingAnimation` are intentionally
+    // excluded: `invoke`/`runThinkingAnimation` are now stable refs, and we
+    // don't want a tasks/mode edit to silently re-trigger a fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, tab, todayDayId]);
+
+  // REMOVED: Auto-refresh on task change was causing infinite loop
+  // Users can manually refresh using the refresh button in the briefing tab
 
   const handleBreakdown = async () => {
     if (!goalInput.trim()) return;
@@ -570,7 +594,7 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
             </button>
           </div>
           <div className="flex gap-1 flex-wrap">
-            {(["briefing", "breakdown", "schedule", "report", "chat"] as Tab[]).map(
+            {(["briefing", "breakdown", "schedule", "report", "chat", "decisions"] as Tab[]).map(
               (t) => (
                 <button
                   key={t}
@@ -589,7 +613,9 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
                         ? "🗓 Plan week"
                         : t === "report"
                           ? "📊 Report"
-                          : "💬 Chat"}
+                          : t === "chat"
+                            ? "💬 Chat"
+                            : "🧠 Decisions"}
                 </button>
               ),
             )}
@@ -609,8 +635,8 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          {/* ENHANCED THINKING ANIMATION */}
-          {loading && (
+          {/* ENHANCED THINKING ANIMATION - only show for non-chat tabs */}
+          {loading && tab !== "chat" && (
             <div className="flex flex-col items-center justify-center py-8 space-y-4">
               {/* Animated brain icon */}
               <div className="relative">
@@ -685,6 +711,7 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
                       onClick={() => {
                         setBriefing(null);
                         setBriefingDate(null);
+                        briefingFetchRef.current = null; // allow the effect to fetch again
                       }}
                       className="text-[10px] text-foreground/40 hover:text-foreground/70 transition-colors"
                       title="Refresh briefing"
@@ -1002,6 +1029,13 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
           {/* CHAT TAB */}
           {tab === "chat" && (
             <div className="space-y-3 animate-fade-in h-[300px] flex flex-col">
+              {/* Inline chat loading indicator */}
+              {chatLoading && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-xs font-body text-foreground/70">
+                  <span className="animate-pulse">🧠</span>
+                  <span>Thinking...</span>
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto space-y-2 min-h-[200px]">
                 {chatMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
@@ -1039,20 +1073,69 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
                       setChatMessages(prev => [...prev, { role: "user", content: userMsg }]);
                       setChatInput("");
 
-                      // Generate AI response (using invoke for a simple chat)
+                      // Generate AI response and handle actions
                       (async () => {
-                        setLoading(true);
-                        const data = await invoke("chat", {
-                          message: userMsg,
-                          tasks: tasks.slice(0, 10).map(t => ({ title: t.title, completed: t.completed, date: t.date })),
-                          todayDate: todayDayId,
-                        });
-                        if (data?.response) {
-                          setChatMessages(prev => [...prev, { role: "ai", content: data.response }]);
-                        } else {
-                          setChatMessages(prev => [...prev, { role: "ai", content: "I understand. Tell me more about what you'd like to accomplish." }]);
+                        setChatLoading(true);
+                        try {
+                          const data = await invoke("chat", {
+                            message: userMsg,
+                            tasks: tasks.slice(0, 15).map(t => ({ id: t.id, title: t.title, completed: t.completed, date: t.date, priority: t.priority })),
+                            todayDate: todayDayId,
+                            weekDates: currentWeekDates,
+                          });
+
+                          // Debug: log what we received
+                          console.log("Chat response data:", data);
+
+                          // Unwrap the { data, source, fallback, timestamp } envelope
+                          const payload = data?.data || data;
+
+                          console.log("Chat payload:", payload);
+
+                          // Handle action if present
+                          if (payload?.action && payload.action.type !== "none") {
+                            const { action } = payload;
+                            if (action.type === "add" && action.taskTitle) {
+                              addTask(todayDayId, action.taskTitle, action.newPriority || "medium", undefined, undefined, null);
+                              setChatMessages(prev => [...prev, { role: "ai", content: payload.response || `Added "${action.taskTitle}" to your today.` }]);
+                            } else if ((action.type === "move" || action.type === "reschedule") && action.taskTitle && action.targetDate) {
+                              const taskToMove = tasks.find(t => t.title.toLowerCase().includes(action.taskTitle.toLowerCase()));
+                              if (taskToMove) {
+                                moveTask(taskToMove.id, action.targetDate);
+                                setChatMessages(prev => [...prev, { role: "ai", content: payload.response || `Rescheduled "${action.taskTitle}" to ${action.targetDate}.` }]);
+                              } else {
+                                setChatMessages(prev => [...prev, { role: "ai", content: payload.response || "I couldn't find that task." }]);
+                              }
+                            } else if (action.type === "priority" && action.taskTitle && action.newPriority) {
+                              const taskToUpdate = tasks.find(t => t.title.toLowerCase().includes(action.taskTitle.toLowerCase()));
+                              if (taskToUpdate) {
+                                updateTaskDetails(taskToUpdate.id, { priority: action.newPriority });
+                                setChatMessages(prev => [...prev, { role: "ai", content: payload.response || `Updated priority for "${action.taskTitle}" to ${action.newPriority}.` }]);
+                              } else {
+                                setChatMessages(prev => [...prev, { role: "ai", content: payload.response || "I couldn't find that task." }]);
+                              }
+                            } else if (action.type === "delete" && action.taskTitle) {
+                              const taskToDelete = tasks.find(t => t.title.toLowerCase().includes(action.taskTitle.toLowerCase()));
+                              if (taskToDelete) {
+                                deleteTask(taskToDelete.id);
+                                setChatMessages(prev => [...prev, { role: "ai", content: payload.response || `Deleted "${action.taskTitle}".` }]);
+                              } else {
+                                setChatMessages(prev => [...prev, { role: "ai", content: payload.response || "I couldn't find that task." }]);
+                              }
+                            } else {
+                              setChatMessages(prev => [...prev, { role: "ai", content: payload.response || "I understand. How can I help?" }]);
+                            }
+                          } else if (payload?.response) {
+                            setChatMessages(prev => [...prev, { role: "ai", content: payload.response }]);
+                          } else {
+                            setChatMessages(prev => [...prev, { role: "ai", content: "I understand. Tell me more about what you'd like to accomplish." }]);
+                          }
+                        } catch (error) {
+                          console.error("Chat error:", error);
+                          setChatMessages(prev => [...prev, { role: "ai", content: "Sorry, something went wrong. Please try again." }]);
+                        } finally {
+                          setChatLoading(false);
                         }
-                        setLoading(false);
                       })();
                     }
                   }}
@@ -1060,6 +1143,75 @@ export function ChiefPanel({ open, onClose }: ChiefPanelProps) {
                   className="flex-1 bg-white/5 border border-foreground/15 rounded-lg px-3 py-2 text-xs font-body text-foreground placeholder:text-foreground/30 outline-none focus:border-primary/40"
                 />
               </div>
+            </div>
+          )}
+
+          {/* DECISIONS TAB - Decision Replay */}
+          {tab === "decisions" && (
+            <div className="space-y-3 animate-fade-in">
+              <div className="rounded-xl bg-gradient-to-br from-primary/20 to-green-500/10 border border-primary/20 p-4">
+                <h3 className="text-xs font-body text-primary/70 uppercase tracking-widest mb-3">
+                  🧠 Decision Replay
+                </h3>
+                <p className="text-xs font-body text-foreground/70 mb-3">
+                  See how AI has helped manage your week
+                </p>
+              </div>
+
+              {explanations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                  <span className="text-3xl">🧠</span>
+                  <p className="text-foreground/60 text-xs font-body text-center">
+                    No decisions recorded yet
+                  </p>
+                  <p className="text-foreground/40 text-[10px] font-body text-center">
+                    Use AI features to see decision history
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {explanations.slice(-10).reverse().map((exp, i) => (
+                    <div
+                      key={exp.id || i}
+                      className="rounded-lg bg-white/5 border border-foreground/10 p-3"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-body text-primary/70">
+                          {(() => {
+                            switch (exp.action) {
+                              case "move":
+                                return "📅";
+                              case "recovery":
+                                return "⚡";
+                              case "split":
+                                return "✂️";
+                              case "priority_change":
+                                return "🎯";
+                              case "reflection":
+                                return "✨";
+                              case "risk_warning":
+                                return "⚠️";
+                              default:
+                                return "✨";
+                            }
+                          })()} {exp.action}
+                        </span>
+                        <span className="text-[9px] font-body text-foreground/40">
+                          {exp.model}
+                        </span>
+                      </div>
+                      <p className="text-xs font-body text-foreground/80">
+                        {exp.reason}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[9px] text-foreground/50">
+                          Confidence: {exp.confidence}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

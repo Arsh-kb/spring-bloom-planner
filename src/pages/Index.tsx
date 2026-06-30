@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect } from 'react';
 import { PlannerProvider, usePlanner } from '@/context/PlannerContext';
 import { Environment } from '@/components/Environment';
@@ -23,6 +24,8 @@ function IndexInner() {
   const [showAIPlanner, setShowAIPlanner] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [demoModeActive, setDemoModeActive] = useState(false);
+  const [demoStep, setDemoStep] = useState(0);
 
   // AI Memory hook
   const { analyzePatterns, getMemoryContext } = useAIMemory();
@@ -36,6 +39,38 @@ function IndexInner() {
       analyzePatterns(tasks, todayDayId);
     }
   }, [tasks, todayDayId, analyzePatterns]);
+
+  // Demo Mode - runs once on first visit
+  useEffect(() => {
+    const hasSeenDemo = localStorage.getItem('vibe2ship-demo-shown');
+    const hasTasks = tasks.length > 0;
+
+    if (!hasSeenDemo && hasTasks && !demoModeActive) {
+      setDemoModeActive(true);
+      localStorage.setItem('vibe2ship-demo-shown', 'true');
+
+      // Demo sequence
+      const demoSteps = [
+        // Step 0: Open AI Chief after 1 second
+        { action: () => setShowAIPlanner(true), delay: 1000 },
+        // Step 1: After 5 seconds, show the planning feature
+        { action: () => setDemoStep(1), delay: 5000 },
+        // Step 2: Close AI and show recovery after another 5 seconds
+        { action: () => {
+          setShowAIPlanner(false);
+          setShowRecovery(true);
+        }, delay: 10000 },
+        // Step 3: Close recovery
+        { action: () => setShowRecovery(false), delay: 15000 },
+        // Step 4: Done
+        { action: () => setDemoModeActive(false), delay: 16000 },
+      ];
+
+      demoSteps.forEach(({ action, delay }) => {
+        setTimeout(action, delay);
+      });
+    }
+  }, [tasks.length, demoModeActive]);
 
   // Listen for open events
   useEffect(() => {
