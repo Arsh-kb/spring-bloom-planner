@@ -296,6 +296,7 @@ interface PlannerContextType {
 
   // Confidence Engine
   confidence: ConfidenceScore | null;
+  setConfidence: React.Dispatch<React.SetStateAction<ConfidenceScore | null>>;
   computeConfidence: () => Promise<void>;
 
   // Task Risk
