@@ -11,16 +11,20 @@ export function MorningBriefing() {
 
   // Weekly load per day (for energy visual)
   const dayLoads = useMemo(() => currentWeekDates.map(d => {
-    const iso = d.toISOString().split('T')[0];
+    const iso = typeof d === 'string' ? d : (d as Date).toISOString().split('T')[0];
     return tasks.filter(t => t.date === iso && !t.completed).length;
   }), [currentWeekDates, tasks]);
   const maxLoad = Math.max(1, ...dayLoads);
-  const todayIndex = currentWeekDates.findIndex(d => d.toISOString().split('T')[0] === todayDayId);
+  const todayIndex = currentWeekDates.findIndex(d => {
+    const iso = typeof d === 'string' ? d : (d as Date).toISOString().split('T')[0];
+    return iso === todayDayId;
+  });
 
   const cycleLabel = useMemo(() => {
     if (!currentWeekDates.length) return '';
-    const s = currentWeekDates[0];
-    const e = currentWeekDates[currentWeekDates.length - 1];
+    const toDate = (d: any) => typeof d === 'string' ? new Date(d) : d as Date;
+    const s = toDate(currentWeekDates[0]);
+    const e = toDate(currentWeekDates[currentWeekDates.length - 1]);
     const opts: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric' };
     return `${s.toLocaleDateString('en-US', opts)} — ${e.toLocaleDateString('en-US', opts)}`;
   }, [currentWeekDates]);
