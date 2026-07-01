@@ -12,8 +12,10 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["'Playfair Display'", "serif"],
-        body: ["'Source Sans 3'", "sans-serif"],
+        display: ["'Cormorant Garamond'", "'Playfair Display'", "serif"],
+        body: ["'Inter'", "'Source Sans 3'", "sans-serif"],
+        mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
+        editorial: ["'Cormorant Garamond'", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
