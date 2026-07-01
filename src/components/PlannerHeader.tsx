@@ -171,10 +171,17 @@ export function PlannerHeader() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
 
         <div className="relative z-10 flex items-center gap-3">
-          <div>
-            <h1 className="font-display text-lg text-foreground text-nature tracking-wide drop-shadow-lg">Springscape</h1>
-            <p className="font-display text-[10px] italic text-foreground/60 leading-tight mt-0.5 drop-shadow-md">{weekTitle}</p>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h1 className="font-editorial italic font-light text-2xl leading-none tracking-tight text-foreground drop-shadow-lg">Vibe2Ship</h1>
+              <span className="px-2 py-0.5 border border-white/20 rounded-full text-[8.5px] font-mono tracking-[0.25em] text-emerald-300/80 uppercase bg-black/30 backdrop-blur-sm">
+                <span className="inline-block w-1 h-1 rounded-full bg-emerald-400 mr-1.5 align-middle shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
+                Chief Active
+              </span>
+            </div>
+            <p className="font-editorial italic text-[11px] text-foreground/55 leading-tight mt-0.5 drop-shadow-md">{weekTitle}</p>
           </div>
+
 
           <div className="flex items-center bg-black/30 backdrop-blur-md rounded-full overflow-hidden text-xs font-body border border-white/10 shadow-inner">
             <button onClick={() => setWeekOffset(w => w - 1)} className="px-2.5 py-1.5 hover:bg-white/10 text-foreground/80 hover:text-foreground transition-colors">◀</button>
