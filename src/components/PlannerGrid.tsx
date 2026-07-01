@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { usePlanner } from "@/context/PlannerContext";
 import { DayCard } from "./DayCard";
+import { MorningBriefing } from "./MorningBriefing";
 import { MasterTaskList } from "./MasterTaskList";
 import { DayDetailView } from "./DayDetailView";
 import type { Day } from "@/types/planner";
@@ -138,6 +139,8 @@ export function PlannerGrid() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
+        {!zenMode && <MorningBriefing />}
+
         {/* Global Week Expand/Collapse Control */}
         <div className="glass-panel rounded-xl p-3 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
