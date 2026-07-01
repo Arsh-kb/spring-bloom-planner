@@ -116,12 +116,18 @@ export function DayCard({ day, isToday, isExpanded, weekConfidence, onZoom }: Da
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
         <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between pointer-events-none">
-          <h3 className="font-display text-foreground text-base sm:text-lg font-semibold text-nature leading-tight drop-shadow-lg">{day.name}</h3>
-          <span className="font-body text-[10px] sm:text-xs text-foreground/80 text-nature drop-shadow-md">
-            {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          <div className="flex flex-col leading-none">
+            <span className={`font-mono text-[9px] uppercase tracking-[0.28em] drop-shadow-md ${isToday ? 'text-emerald-300' : 'text-foreground/50'}`}>{day.name}</span>
+            <span className={`font-editorial italic font-light text-3xl sm:text-4xl mt-1 drop-shadow-lg ${isToday ? 'text-emerald-100' : 'text-foreground/90'}`}>
+              {new Date(day.date).getDate()}
+            </span>
+          </div>
+          <span className="font-mono text-[9px] text-foreground/50 uppercase tracking-[0.2em] drop-shadow-md">
+            {new Date(day.date).toLocaleDateString('en-US', { month: 'short' })}
           </span>
         </div>
-        {isToday && <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary shadow-lg shadow-primary/50" />}
+        {isToday && <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)] animate-pulse" />}
+
         <FloraGrowth day={day} isHeader />
       </div>
 

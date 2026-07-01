@@ -801,7 +801,6 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       totalToday: tasks.filter((t) => t.date === todayDayId).length,
       overdueCount: tasks.filter((t) => !t.completed && t.date < todayDayId).length,
       riskTasks: result.metrics.conflictCount,
-      reasoning: result.explanation,
     });
   }, [tasks, todayDayId, currentWeekDates, focusSessions]);
 
@@ -1000,7 +999,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
         addTask(placed.date, placed.title, placed.priority, placed.mood, placed.timeBlock);
       }
       addExplanation({
-        action: "schedule",
+        action: "reschedule",
         reason: joinReplay(outcome.narrative),
         confidence: outcome.confidenceAfter ?? 0,
         model: "scheduling-engine",
